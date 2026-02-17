@@ -4,6 +4,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import DashboardShell from './pages/DashboardShell';
 
+import IngestionPage from './pages/IngestionPage';
+
 function App() {
     return (
         <BrowserRouter>
@@ -15,6 +17,14 @@ function App() {
                         element={
                             <ProtectedRoute>
                                 <DashboardShell />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/ingestion"
+                        element={
+                            <ProtectedRoute>
+                                <IngestionPage />
                             </ProtectedRoute>
                         }
                     />
