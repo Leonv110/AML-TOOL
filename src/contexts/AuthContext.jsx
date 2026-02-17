@@ -183,5 +183,5 @@ function getErrorMessage(code) {
         'auth/network-request-failed': 'Network error. Please check your connection.',
         'auth/invalid-credential': 'Invalid credentials. Please check your email and password.',
     };
-    return messages[code] || 'Authentication failed. Please try again.';
+    return messages[code] || `Authentication failed: ${code}. Please try again.`;
 }
