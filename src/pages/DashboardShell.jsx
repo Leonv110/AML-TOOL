@@ -113,11 +113,18 @@ export default function DashboardShell() {
 
                 <div className="modules-grid">
                     {MODULES.map(mod => (
-                        <div key={mod.id} className="module-card">
+                        <div
+                            key={mod.id}
+                            className="module-card"
+                            onClick={() => mod.id === 'ingestion' && window.location.assign('/ingestion')}
+                            style={{ cursor: mod.id === 'ingestion' ? 'pointer' : 'default' }}
+                        >
                             <div className="module-icon">{mod.icon}</div>
                             <h3>{mod.title}</h3>
                             <p>{mod.description}</p>
-                            <span className="module-status">{mod.status}</span>
+                            <span className={`module-status ${mod.id === 'ingestion' ? 'active' : ''}`}>
+                                {mod.id === 'ingestion' ? 'Active' : mod.status}
+                            </span>
                         </div>
                     ))}
                 </div>
