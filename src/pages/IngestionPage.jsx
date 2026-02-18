@@ -1,4 +1,3 @@
-
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
@@ -13,48 +12,9 @@ export default function IngestionPage() {
     const [file, setFile] = useState(null);
     const [uploading, setUploading] = useState(false);
     const [progress, setProgress] = useState(0);
-    const [status, setStatus] = useState(null); // { type: 'success' | 'error', message: string }
+    const [status, setStatus] = useState(null);
+    const [preview, setPreview] = useState(null); // { columns: [], rows: [], totalRows: number }
     const fileInputRef = useRef(null);
-
-    const handleFileSelect = (e) => {
-        const selectedFile = e.target.files[0];
-        if (selectedFile) {
-            if (!selectedFile.name.match(/\.(xlsx|xls)$/)) {
-                setStatus({
-                    type: 'error',
-                    message: 'Please upload a valid Excel file (.xlsx or .xls)'
-                });
-                return;
-            }
-            setFile(selectedFile);
-
-            setStatus(null);
-            setProgress(0);
-        }
-    };
-
-    const handleDragOver = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-    };
-
-    const handleDrop = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const droppedFile = e.dataTransfer.files[0];
-        if (droppedFile) {
-            if (!droppedFile.name.match(/\.(xlsx|xls)$/)) {
-                setStatus({
-                    type: 'error',
-                    message: 'Please upload a valid Excel file (.xlsx or .xls)'
-                });
-                return;
-            }
-            setFile(droppedFile);
-            setStatus(null);
-            setProgress(0);
-        }
-    };
 
     const parseExcel = (file) => {
         return new Promise((resolve, reject) => {
@@ -76,12 +36,73 @@ export default function IngestionPage() {
         });
     };
 
+    const handleFileSelect = async (e) => {
+        const selectedFile = e.target.files[0];
+        if (selectedFile) {
+            if (!selectedFile.name.match(/\.(xlsx|xls)$/)) {
+                setStatus({ type: 'error', message: 'Please upload a valid Excel file (.xlsx or .xls)' });
+                return;
+            }
+            setFile(selectedFile);
+            setStatus(null);
+            setProgress(0);
+
+            // Auto-parse for preview
+            try {
+                const parsed = await parseExcel(selectedFile);
+                if (parsed.length > 0) {
+                    setPreview({
+                        columns: Object.keys(parsed[0]),
+                        rows: parsed.slice(0, 5),
+                        totalRows: parsed.length,
+                    });
+                }
+            } catch {
+                setPreview(null);
+            }
+        }
+    };
+
+    const handleDragOver = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+    };
+
+    const handleDrop = async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const droppedFile = e.dataTransfer.files[0];
+        if (droppedFile) {
+            if (!droppedFile.name.match(/\.(xlsx|xls)$/)) {
+                setStatus({ type: 'error', message: 'Please upload a valid Excel file (.xlsx or .xls)' });
+                return;
+            }
+            setFile(droppedFile);
+            setStatus(null);
+            setProgress(0);
+
+            // Auto-parse for preview
+            try {
+                const parsed = await parseExcel(droppedFile);
+                if (parsed.length > 0) {
+                    setPreview({
+                        columns: Object.keys(parsed[0]),
+                        rows: parsed.slice(0, 5),
+                        totalRows: parsed.length,
+                    });
+                }
+            } catch {
+                setPreview(null);
+            }
+        }
+    };
+
     const handleUpload = async () => {
         if (!file || !user) return;
 
         setUploading(true);
         setStatus(null);
-        setProgress(10); // Start progress
+        setProgress(10);
 
         try {
             // 1. Parse Excel File
@@ -92,14 +113,14 @@ export default function IngestionPage() {
                 throw new Error('Excel file is empty');
             }
 
-            // 2. Prepare Data for Supabase
+            // 2. Prepare Data for Supabase (user.id for Supabase Auth)
             const formattedData = parsedData.map(row => ({
-                User_ID: user.uid, // Enforce partitioning by User ID
+                User_ID: user.id,
                 Transaction_ID: row['Transaction_ID']?.toString(),
                 Amount: parseFloat(row['Amount']) || 0,
                 Currency: row['Currency'],
                 Transaction_Type: row['Transaction_Type'],
-                Timestamp: row['Timestamp']?.toString(), // Keep as string or convert to ISO if needed
+                Timestamp: row['Timestamp']?.toString(),
                 Origin_ID: row['Origin_ID'],
                 Destination_ID: row['Destination_ID'],
                 Degree_Centrality: parseFloat(row['Degree_Centrality']) || 0,
@@ -112,21 +133,19 @@ export default function IngestionPage() {
 
             setProgress(50);
 
-            // 3. Handle 'Replace' Mode (Delete existing data for user)
+            // 3. Handle 'Replace' Mode
             if (mode === 'replace') {
                 const { error: deleteError } = await supabase
                     .from('transactions')
                     .delete()
-                    .eq('User_ID', user.uid);
+                    .eq('User_ID', user.id);
 
                 if (deleteError) throw deleteError;
             }
 
             setProgress(70);
 
-            // 4. Insert Data (Batch insert)
-            // Supabase limits payload size, so for large files, chunking might be needed.
-            // For now, assuming reasonable file size, we insert in batches of 1000.
+            // 4. Batch insert (1000 rows per batch)
             const batchSize = 1000;
             for (let i = 0; i < formattedData.length; i += batchSize) {
                 const batch = formattedData.slice(i, i + batchSize);
@@ -135,11 +154,16 @@ export default function IngestionPage() {
                     .insert(batch);
 
                 if (insertError) throw insertError;
+
+                // Update progress proportionally
+                const batchProgress = 70 + Math.round((i / formattedData.length) * 30);
+                setProgress(Math.min(batchProgress, 99));
             }
 
             setProgress(100);
             setStatus({ type: 'success', message: `Successfully ingested ${formattedData.length} records.` });
-            setFile(null); // clear file after success
+            setFile(null);
+            setPreview(null);
 
         } catch (error) {
             console.error('Upload failed:', error);
@@ -151,6 +175,13 @@ export default function IngestionPage() {
         } finally {
             setUploading(false);
         }
+    };
+
+    const clearFile = () => {
+        setFile(null);
+        setPreview(null);
+        setStatus(null);
+        setProgress(0);
     };
 
     return (
@@ -224,13 +255,50 @@ export default function IngestionPage() {
                             <span style={{ color: '#64748b', fontSize: '0.875rem' }}>({(file.size / 1024).toFixed(2)} KB)</span>
                         </div>
                         {!uploading && (
-                            <button className="remove-file" onClick={() => { setFile(null); setStatus(null); setProgress(0); }}>
+                            <button className="remove-file" onClick={clearFile}>
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                     <line x1="18" y1="6" x2="6" y2="18" />
                                     <line x1="6" y1="6" x2="18" y2="18" />
                                 </svg>
                             </button>
                         )}
+                    </div>
+                )}
+
+                {/* Column Preview — shows after file selection, before upload */}
+                {preview && !uploading && (
+                    <div className="preview-section">
+                        <div className="preview-header">
+                            <h3>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                    <circle cx="12" cy="12" r="3" />
+                                </svg>
+                                Data Preview
+                            </h3>
+                            <span className="preview-count">{preview.totalRows.toLocaleString()} rows × {preview.columns.length} columns</span>
+                        </div>
+                        <div className="preview-table-wrapper">
+                            <table className="preview-table">
+                                <thead>
+                                    <tr>
+                                        {preview.columns.map((col, i) => (
+                                            <th key={i}>{col}</th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {preview.rows.map((row, i) => (
+                                        <tr key={i}>
+                                            {preview.columns.map((col, j) => (
+                                                <td key={j}>{row[col]?.toString() ?? '—'}</td>
+                                            ))}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <p className="preview-note">Showing first 5 rows. Full dataset will be ingested on upload.</p>
                     </div>
                 )}
 

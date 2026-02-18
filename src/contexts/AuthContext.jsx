@@ -1,15 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import {
-    auth,
-    isConfigured,
-    signInWithEmailAndPassword,
-    createUserWithEmailAndPassword,
-    signOut as firebaseSignOut,
-    setPersistence,
-    browserLocalPersistence,
-    browserSessionPersistence,
-    onAuthStateChanged
-} from '../firebase';
+import { supabase, isConfigured } from '../supabaseClient';
 
 const AuthContext = createContext(null);
 
@@ -77,54 +67,72 @@ export function AuthProvider({ children }) {
         };
     }, [user, resetSessionTimer, startSessionTimer, clearTimers]);
 
-    // --- Firebase auth listener ---
+    // --- Supabase auth listener ---
     useEffect(() => {
-        if (!isConfigured || !auth) {
-            // Firebase not configured — set loading to false so UI renders
+        if (!isConfigured || !supabase) {
             setLoading(false);
             return;
         }
 
-        const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-            setUser(firebaseUser);
+        // Get initial session
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setUser(session?.user ?? null);
             setLoading(false);
         });
-        return unsubscribe;
+
+        // Listen for auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            (_event, session) => {
+                setUser(session?.user ?? null);
+                setLoading(false);
+            }
+        );
+
+        return () => subscription.unsubscribe();
     }, []);
 
     // --- Auth methods ---
     const login = async (email, password, rememberMe = false) => {
-        if (!isConfigured || !auth) {
-            const msg = 'Firebase is not configured. Please add your Firebase credentials to the .env file.';
+        if (!isConfigured || !supabase) {
+            const msg = 'Supabase is not configured. Please add your Supabase credentials to the .env file.';
             setError(msg);
             throw new Error(msg);
         }
 
         setError(null);
         try {
-            await setPersistence(auth, rememberMe ? browserLocalPersistence : browserSessionPersistence);
-            const result = await signInWithEmailAndPassword(auth, email, password);
-            return result.user;
+            const { data, error: authError } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
+
+            if (authError) throw authError;
+            return data.user;
         } catch (err) {
-            const message = getErrorMessage(err.code);
+            const message = getErrorMessage(err.message);
             setError(message);
             throw new Error(message);
         }
     };
 
     const signup = async (email, password) => {
-        if (!isConfigured || !auth) {
-            const msg = 'Firebase is not configured. Please add your Firebase credentials to the .env file.';
+        if (!isConfigured || !supabase) {
+            const msg = 'Supabase is not configured. Please add your Supabase credentials to the .env file.';
             setError(msg);
             throw new Error(msg);
         }
 
         setError(null);
         try {
-            const result = await createUserWithEmailAndPassword(auth, email, password);
-            return result.user;
+            const { data, error: authError } = await supabase.auth.signUp({
+                email,
+                password,
+            });
+
+            if (authError) throw authError;
+            return data.user;
         } catch (err) {
-            const message = getErrorMessage(err.code);
+            const message = getErrorMessage(err.message);
             setError(message);
             throw new Error(message);
         }
@@ -132,9 +140,9 @@ export function AuthProvider({ children }) {
 
     const logout = async () => {
         clearTimers();
-        if (!auth) return;
+        if (!supabase) return;
         try {
-            await firebaseSignOut(auth);
+            await supabase.auth.signOut();
         } catch (err) {
             console.error('Logout error:', err);
         }
@@ -171,17 +179,16 @@ export function useAuth() {
     return context;
 }
 
-function getErrorMessage(code) {
-    const messages = {
-        'auth/invalid-email': 'Invalid email address format.',
-        'auth/user-disabled': 'This account has been disabled by an administrator.',
-        'auth/user-not-found': 'No account found with this email address.',
-        'auth/wrong-password': 'Incorrect password. Please try again.',
-        'auth/email-already-in-use': 'An account with this email already exists.',
-        'auth/weak-password': 'Password must be at least 6 characters.',
-        'auth/too-many-requests': 'Too many failed attempts. Account temporarily locked.',
-        'auth/network-request-failed': 'Network error. Please check your connection.',
-        'auth/invalid-credential': 'Invalid credentials. Please check your email and password.',
-    };
-    return messages[code] || `Authentication failed: ${code}. Please try again.`;
+function getErrorMessage(message) {
+    const lowerMsg = (message || '').toLowerCase();
+
+    if (lowerMsg.includes('invalid login')) return 'Invalid email or password. Please try again.';
+    if (lowerMsg.includes('email not confirmed')) return 'Please confirm your email address before logging in.';
+    if (lowerMsg.includes('user already registered')) return 'An account with this email already exists.';
+    if (lowerMsg.includes('password')) return 'Password must be at least 6 characters.';
+    if (lowerMsg.includes('rate limit')) return 'Too many attempts. Please wait a moment and try again.';
+    if (lowerMsg.includes('network')) return 'Network error. Please check your connection.';
+    if (lowerMsg.includes('signup is disabled')) return 'New registrations are currently disabled.';
+
+    return message || 'Authentication failed. Please try again.';
 }

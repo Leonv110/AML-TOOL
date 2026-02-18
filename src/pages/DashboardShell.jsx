@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import './DashboardShell.css';
 
@@ -58,6 +59,7 @@ const MODULES = [
 ];
 
 export default function DashboardShell() {
+    const navigate = useNavigate();
     const { user, logout, sessionWarning, sessionTimeLeft, resetSessionTimer } = useAuth();
 
     return (
@@ -116,7 +118,7 @@ export default function DashboardShell() {
                         <div
                             key={mod.id}
                             className="module-card"
-                            onClick={() => mod.id === 'ingestion' && window.location.assign('/ingestion')}
+                            onClick={() => mod.id === 'ingestion' && navigate('/ingestion')}
                             style={{ cursor: mod.id === 'ingestion' ? 'pointer' : 'default' }}
                         >
                             <div className="module-icon">{mod.icon}</div>
@@ -135,8 +137,8 @@ export default function DashboardShell() {
                         <span>Authentication: Active</span>
                     </div>
                     <div className="status-item">
-                        <span className="status-dot pending" />
-                        <span>Data Ingestion: Pending Build</span>
+                        <span className="status-dot active" />
+                        <span>Data Ingestion: Active</span>
                     </div>
                     <div className="status-item">
                         <span className="status-dot pending" />
