@@ -126,16 +126,18 @@ export function AuthProvider({ children }) {
 
             if (authError) throw authError;
             // fetch role from profiles table
+            let fetchedRole = null;
             try {
                 const uid = data?.user?.id;
                 if (uid) {
                     const { data: profileData } = await supabase.from('profiles').select('role').eq('id', uid).maybeSingle();
-                    setUserRole(profileData?.role ?? null);
+                    fetchedRole = profileData?.role ?? null;
+                    setUserRole(fetchedRole);
                 }
             } catch (e) {
                 setUserRole(null);
             }
-            return data.user;
+            return { user: data.user, role: fetchedRole };
         } catch (err) {
             const message = getErrorMessage(err.message);
             setError(message);

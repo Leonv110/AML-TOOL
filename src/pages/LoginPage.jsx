@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import './LoginPage.css';
@@ -22,15 +22,16 @@ export default function LoginPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [localError, setLocalError] = useState('');
     const [mounted, setMounted] = useState(false);
+    const isLoggingInRef = useRef(false);
 
     const { login, signup, logout, error: authError, clearError, user, userRole } = useAuth();
     const navigate = useNavigate();
 
     useEffect(() => { setMounted(true); }, []);
 
-    // Redirect if already logged in
+    // Redirect if already logged in (skip during active login attempt)
     useEffect(() => {
-        if (user) navigate('/dashboard', { replace: true });
+        if (user && !isLoggingInRef.current) navigate('/dashboard', { replace: true });
     }, [user, navigate]);
 
     // Password strength score
@@ -61,16 +62,18 @@ export default function LoginPage() {
         }
 
         setIsSubmitting(true);
+        isLoggingInRef.current = true;
         try {
             if (isSignup) {
                 await signup(email, password, role);
             } else {
-                await login(email, password, rememberMe);
-                // If userRole is present and doesn't match selected role, reject login
-                if (role && userRole && userRole !== role) {
+                const result = await login(email, password, rememberMe);
+                // Check role from the freshly-fetched profile, not stale React state
+                if (role && result.role && result.role !== role) {
                     setLocalError('Role mismatch: your account does not have the selected role.');
                     await logout();
                     setIsSubmitting(false);
+                    isLoggingInRef.current = false;
                     return;
                 }
             }
@@ -78,6 +81,7 @@ export default function LoginPage() {
         } catch {
             // Error is handled by AuthContext
         } finally {
+            isLoggingInRef.current = false;
             setIsSubmitting(false);
         }
     };
