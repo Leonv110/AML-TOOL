@@ -4,6 +4,71 @@ import './DashboardShell.css';
 
 const MODULES = [
     {
+        id: 'dashboard',
+        title: 'Dashboard',
+        description: 'Overview of key metrics, alerts, and compliance status',
+        icon: (
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <rect x="3" y="3" width="7" height="7" rx="1" />
+                <rect x="14" y="3" width="7" height="7" rx="1" />
+                <rect x="3" y="14" width="7" height="7" rx="1" />
+                <rect x="14" y="14" width="7" height="7" rx="1" />
+            </svg>
+        ),
+        status: 'Coming Soon',
+    },
+    {
+        id: 'risk-analysis',
+        title: 'Customer Risk Analysis',
+        description: 'Evaluate and score customer risk profiles for AML compliance',
+        icon: (
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+                <circle cx="8.5" cy="7" r="4" />
+                <path d="M20 8v6M23 11h-6" />
+            </svg>
+        ),
+        status: 'Coming Soon',
+    },
+    {
+        id: 'monitoring',
+        title: 'Transaction Monitoring',
+        description: 'Real-time transaction surveillance and pattern detection',
+        icon: (
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+            </svg>
+        ),
+        status: 'Coming Soon',
+    },
+    {
+        id: 'alert-review',
+        title: 'Alert Review',
+        description: 'Investigate and disposition system-generated compliance alerts',
+        icon: (
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 01-3.46 0" />
+            </svg>
+        ),
+        status: 'Coming Soon',
+    },
+    {
+        id: 'sar-workshop',
+        title: 'SAR Workshop',
+        description: 'Draft and submit Suspicious Activity Reports for regulators',
+        icon: (
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+                <polyline points="10 9 9 9 8 9" />
+            </svg>
+        ),
+        status: 'Coming Soon',
+    },
+    {
         id: 'ingestion',
         title: 'Data Ingestion',
         description: 'Upload and parse Excel datasets with field mapping',
@@ -17,50 +82,11 @@ const MODULES = [
         ),
         status: 'Coming Soon',
     },
-    {
-        id: 'screening',
-        title: 'OFAC Screening',
-        description: 'Automated global watchlist and sanctions screening',
-        icon: (
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <circle cx="11" cy="11" r="8" />
-                <path d="M21 21l-4.35-4.35" />
-                <path d="M11 8v6M8 11h6" />
-            </svg>
-        ),
-        status: 'Coming Soon',
-    },
-    {
-        id: 'monitoring',
-        title: 'Transaction Monitor',
-        description: 'Real-time transaction surveillance and alerting',
-        icon: (
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-            </svg>
-        ),
-        status: 'Coming Soon',
-    },
-    {
-        id: 'reports',
-        title: 'SAR Reports',
-        description: 'Generate Suspicious Activity Reports for regulators',
-        icon: (
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="16" y1="13" x2="8" y2="13" />
-                <line x1="16" y1="17" x2="8" y2="17" />
-                <polyline points="10 9 9 9 8 9" />
-            </svg>
-        ),
-        status: 'Coming Soon',
-    },
 ];
 
 export default function DashboardShell() {
     const navigate = useNavigate();
-    const { user, logout, sessionWarning, sessionTimeLeft, resetSessionTimer } = useAuth();
+    const { user, userRole, logout, sessionWarning, sessionTimeLeft, resetSessionTimer } = useAuth();
 
     return (
         <div className="dashboard-shell">
@@ -93,7 +119,7 @@ export default function DashboardShell() {
                 <div className="dash-user">
                     <div className="user-info">
                         <span className="user-email">{user?.email}</span>
-                        <span className="user-role">Investigator</span>
+                        <span className="user-role">{userRole || 'User'}</span>
                     </div>
                     <button className="logout-btn" onClick={logout}>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -109,7 +135,7 @@ export default function DashboardShell() {
             {/* Main content */}
             <main className="dash-main">
                 <div className="welcome-section">
-                    <h1>Welcome, Investigator</h1>
+                    <h1>Welcome{userRole ? `, ${userRole.charAt(0).toUpperCase() + userRole.slice(1)}` : ''}</h1>
                     <p>Select a module to begin your forensic analysis workflow</p>
                 </div>
 

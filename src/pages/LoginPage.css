@@ -311,6 +311,51 @@
   box-sizing: border-box;
 }
 
+/* Style selects to match inputs (dark glass, custom arrow) */
+.input-group select {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  padding-right: 2.5rem;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(71, 85, 105, 0.3);
+  border-radius: 10px;
+  color: #e2e8f0;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.875rem;
+  outline: none;
+  transition: all 0.25s ease;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, #94a3b8 50%),
+                    linear-gradient(135deg, #94a3b8 50%, transparent 50%);
+  background-position: calc(100% - 1.1rem) calc(50% - 3px), calc(100% - 0.6rem) calc(50% - 3px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+
+.input-group select::placeholder {
+  color: #334155;
+}
+
+.input-group select:focus {
+  border-color: rgba(56, 189, 248, 0.5);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.08), 0 0 15px rgba(56, 189, 248, 0.05);
+  background: rgba(15, 23, 42, 0.8);
+}
+
+.input-group select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Dropdown option styling where supported */
+.input-group select option {
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
 .input-group input::placeholder {
   color: #334155;
 }

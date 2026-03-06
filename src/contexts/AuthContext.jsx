@@ -8,6 +8,7 @@ const WARNING_BEFORE_MS = 5 * 60 * 1000;   // warn 5 min before timeout
 
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
+    const [userRole, setUserRole] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [sessionWarning, setSessionWarning] = useState(false);
@@ -76,14 +77,31 @@ export function AuthProvider({ children }) {
 
         // Get initial session
         supabase.auth.getSession().then(({ data: { session } }) => {
-            setUser(session?.user ?? null);
+            const u = session?.user ?? null;
+            setUser(u);
+            if (u) {
+                // fetch profile role
+                supabase.from('profiles').select('role').eq('id', u.id).maybeSingle().then(({ data }) => {
+                    setUserRole(data?.role ?? null);
+                }).catch(() => setUserRole(null));
+            } else {
+                setUserRole(null);
+            }
             setLoading(false);
         });
 
         // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             (_event, session) => {
-                setUser(session?.user ?? null);
+                const u = session?.user ?? null;
+                setUser(u);
+                if (u) {
+                    supabase.from('profiles').select('role').eq('id', u.id).maybeSingle().then(({ data }) => {
+                        setUserRole(data?.role ?? null);
+                    }).catch(() => setUserRole(null));
+                } else {
+                    setUserRole(null);
+                }
                 setLoading(false);
             }
         );
@@ -107,6 +125,16 @@ export function AuthProvider({ children }) {
             });
 
             if (authError) throw authError;
+            // fetch role from profiles table
+            try {
+                const uid = data?.user?.id;
+                if (uid) {
+                    const { data: profileData } = await supabase.from('profiles').select('role').eq('id', uid).maybeSingle();
+                    setUserRole(profileData?.role ?? null);
+                }
+            } catch (e) {
+                setUserRole(null);
+            }
             return data.user;
         } catch (err) {
             const message = getErrorMessage(err.message);
@@ -115,7 +143,7 @@ export function AuthProvider({ children }) {
         }
     };
 
-    const signup = async (email, password) => {
+    const signup = async (email, password, role = 'student') => {
         if (!isConfigured || !supabase) {
             const msg = 'Supabase is not configured. Please add your Supabase credentials to the .env file.';
             setError(msg);
@@ -127,9 +155,21 @@ export function AuthProvider({ children }) {
             const { data, error: authError } = await supabase.auth.signUp({
                 email,
                 password,
+                options: { data: { role } },
             });
 
             if (authError) throw authError;
+
+            // If a user object was returned immediately (no email confirmation required), upsert a profile row
+            const uid = data?.user?.id;
+            if (uid) {
+                try {
+                    await supabase.from('profiles').upsert({ id: uid, email, role });
+                    setUserRole(role);
+                } catch (e) {
+                    // ignore profile insert errors; backend trigger or later sync can set role
+                }
+            }
             return data.user;
         } catch (err) {
             const message = getErrorMessage(err.message);
@@ -152,6 +192,7 @@ export function AuthProvider({ children }) {
 
     const value = {
         user,
+        userRole,
         loading,
         error,
         sessionWarning,

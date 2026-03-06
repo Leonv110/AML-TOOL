@@ -16,13 +16,14 @@ export default function LoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [role, setRole] = useState('student');
     const [showPassword, setShowPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [localError, setLocalError] = useState('');
     const [mounted, setMounted] = useState(false);
 
-    const { login, signup, error: authError, clearError, user } = useAuth();
+    const { login, signup, logout, error: authError, clearError, user, userRole } = useAuth();
     const navigate = useNavigate();
 
     useEffect(() => { setMounted(true); }, []);
@@ -62,9 +63,16 @@ export default function LoginPage() {
         setIsSubmitting(true);
         try {
             if (isSignup) {
-                await signup(email, password);
+                await signup(email, password, role);
             } else {
                 await login(email, password, rememberMe);
+                // If userRole is present and doesn't match selected role, reject login
+                if (role && userRole && userRole !== role) {
+                    setLocalError('Role mismatch: your account does not have the selected role.');
+                    await logout();
+                    setIsSubmitting(false);
+                    return;
+                }
             }
             navigate('/dashboard', { replace: true });
         } catch {
@@ -171,6 +179,27 @@ export default function LoginPage() {
                             disabled={isSubmitting}
                             required
                         />
+                    </div>
+
+                    {/* Role selector */}
+                    <div className="input-group">
+                        <label htmlFor="role">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M12 2a5 5 0 00-5 5v2H6a2 2 0 00-2 2v3h16v-3a2 2 0 00-2-2h-1V7a5 5 0 00-5-5z" />
+                                <circle cx="12" cy="14" r="4" />
+                            </svg>
+                            Role
+                        </label>
+                        <select
+                            id="role"
+                            value={role}
+                            onChange={(e) => setRole(e.target.value)}
+                            disabled={isSubmitting}
+                        >
+                            <option value="student">Student</option>
+                            <option value="admin">Admin/Trainer</option>
+                            <option value="trainer">Exam Access</option>
+                        </select>
                     </div>
 
                     {/* Password */}
