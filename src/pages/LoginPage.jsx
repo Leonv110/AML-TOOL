@@ -138,8 +138,8 @@ export default function LoginPage() {
                             </svg>
                         </div>
                         <div className="logo-text">
-                            <h1>Forensic Data Hub</h1>
-                            <p className="subtitle">Anti-Money Laundering Intelligence Platform</p>
+                            <h1>GAFA</h1>
+                            <p className="subtitle">Global Anti-Financial Crime Academy</p>
                         </div>
                     </div>
                     <div className="status-line">
@@ -151,7 +151,7 @@ export default function LoginPage() {
                 {/* Form */}
                 <form onSubmit={handleSubmit} className="login-form" noValidate>
                     <h2 className="form-title">
-                        {isSignup ? 'Register New Investigator' : 'Investigator Login'}
+                        {isSignup ? 'Register' : 'Login'}
                     </h2>
 
                     {displayError && (
@@ -163,6 +163,27 @@ export default function LoginPage() {
                             <span>{displayError}</span>
                         </div>
                     )}
+
+                    {/* Role selector */}
+                    <div className="input-group">
+                        <label htmlFor="role">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M12 2a5 5 0 00-5 5v2H6a2 2 0 00-2 2v3h16v-3a2 2 0 00-2-2h-1V7a5 5 0 00-5-5z" />
+                                <circle cx="12" cy="14" r="4" />
+                            </svg>
+                            Role
+                        </label>
+                        <select
+                            id="role"
+                            value={role}
+                            onChange={(e) => setRole(e.target.value)}
+                            disabled={isSubmitting}
+                        >
+                            <option value="student">Student</option>
+                            <option value="admin">Admin/Trainer</option>
+                            <option value="exam">Exam Access</option>
+                        </select>
+                    </div>
 
                     {/* Email */}
                     <div className="input-group">
@@ -183,27 +204,6 @@ export default function LoginPage() {
                             disabled={isSubmitting}
                             required
                         />
-                    </div>
-
-                    {/* Role selector */}
-                    <div className="input-group">
-                        <label htmlFor="role">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M12 2a5 5 0 00-5 5v2H6a2 2 0 00-2 2v3h16v-3a2 2 0 00-2-2h-1V7a5 5 0 00-5-5z" />
-                                <circle cx="12" cy="14" r="4" />
-                            </svg>
-                            Role
-                        </label>
-                        <select
-                            id="role"
-                            value={role}
-                            onChange={(e) => setRole(e.target.value)}
-                            disabled={isSubmitting}
-                        >
-                            <option value="student">Student</option>
-                            <option value="admin">Admin/Trainer</option>
-                            <option value="trainer">Exam Access</option>
-                        </select>
                     </div>
 
                     {/* Password */}
@@ -340,7 +340,7 @@ export default function LoginPage() {
 
                 {/* Toggle signup/login */}
                 <div className="toggle-mode">
-                    <span>{isSignup ? 'Already registered?' : 'New investigator?'}</span>
+                    <span>{isSignup ? 'Already registered?' : 'New user?'}</span>
                     <button type="button" onClick={toggleMode} disabled={isSubmitting}>
                         {isSignup ? 'Sign in here' : 'Register account'}
                     </button>
@@ -365,9 +365,9 @@ export default function LoginPage() {
 
             {/* Build info */}
             <div className="build-info">
-                <span>Forensic Data Hub v1.0.0</span>
+                <span>GAFA v1.0.0</span>
                 <span className="separator">•</span>
-                <span>AML Intelligence Platform</span>
+                <span>Global Anti-Financial Crime Academy</span>
                 <span className="separator">•</span>
                 <span>© 2026 GAFA</span>
             </div>
