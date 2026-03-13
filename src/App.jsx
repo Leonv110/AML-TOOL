@@ -3,8 +3,8 @@ import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import DashboardShell from './pages/DashboardShell';
-
 import IngestionPage from './pages/IngestionPage';
+import TransactionsTab from './components/TransactionsTab';
 
 function App() {
     return (
@@ -27,6 +27,14 @@ function App() {
                                 <IngestionPage />
                             </ProtectedRoute>
                         }
+                    />
+                    <Route 
+                        path="/monitoring" 
+                        element={
+                             <ProtectedRoute>
+                                 <TransactionsTab />
+                             </ProtectedRoute>
+                        } 
                     />
                     <Route path="*" element={<Navigate to="/login" replace />} />
                 </Routes>

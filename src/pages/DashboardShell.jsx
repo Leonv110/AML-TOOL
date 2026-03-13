@@ -39,7 +39,7 @@ const MODULES = [
                 <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
             </svg>
         ),
-        status: 'Coming Soon',
+        status: 'Active',
     },
     {
         id: 'alert-review',
@@ -144,14 +144,17 @@ export default function DashboardShell() {
                         <div
                             key={mod.id}
                             className="module-card"
-                            onClick={() => mod.id === 'ingestion' && navigate('/ingestion')}
-                            style={{ cursor: mod.id === 'ingestion' ? 'pointer' : 'default' }}
+                            onClick={() => {
+                                if (mod.id === 'ingestion') navigate('/ingestion');
+                                else if (mod.id === 'monitoring') navigate('/monitoring');
+                            }}
+                            style={{ cursor: mod.id === 'ingestion' || mod.id === 'monitoring' ? 'pointer' : 'default' }}
                         >
                             <div className="module-icon">{mod.icon}</div>
                             <h3>{mod.title}</h3>
                             <p>{mod.description}</p>
-                            <span className={`module-status ${mod.id === 'ingestion' ? 'active' : ''}`}>
-                                {mod.id === 'ingestion' ? 'Active' : mod.status}
+                            <span className={`module-status ${mod.status === 'Active' ? 'active' : ''}`}>
+                                {mod.status}
                             </span>
                         </div>
                     ))}

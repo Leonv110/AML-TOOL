@@ -22,7 +22,7 @@ export default function IngestionPage() {
             reader.onload = (e) => {
                 try {
                     const data = e.target.result;
-                    const workbook = XLSX.read(data, { type: 'binary' });
+                    const workbook = XLSX.read(data, { type: 'binary', cellDates: true });
                     const sheetName = workbook.SheetNames[0];
                     const sheet = workbook.Sheets[sheetName];
                     const jsonData = XLSX.utils.sheet_to_json(sheet);
@@ -115,20 +115,30 @@ export default function IngestionPage() {
 
             // 2. Prepare Data for Supabase (user.id for Supabase Auth)
             const formattedData = parsedData.map(row => ({
-                User_ID: user.id,
-                Transaction_ID: row['Transaction_ID']?.toString(),
-                Amount: parseFloat(row['Amount']) || 0,
-                Currency: row['Currency'],
-                Transaction_Type: row['Transaction_Type'],
-                Timestamp: row['Timestamp']?.toString(),
-                Origin_ID: row['Origin_ID'],
-                Destination_ID: row['Destination_ID'],
-                Degree_Centrality: parseFloat(row['Degree_Centrality']) || 0,
-                Path_Length_Hops: parseInt(row['Path_Length_Hops']) || 0,
-                Full_Name: row['Full_Name'],
-                Entity_Type: row['Entity_Type'],
-                Sanctions_Program: row['Sanctions_Program'],
-                Country_Risk_Level: row['Country_Risk_Level']
+                user_id: row['User_ID']?.toString() || user.id,
+                account_id: row['Account_ID']?.toString(),
+                transaction_id: row['Transaction_ID']?.toString(),
+                timestamp: row['Timestamp'] instanceof Date ? row['Timestamp'].toISOString() : row['Timestamp']?.toString(),
+                amount: parseFloat(row['Amount']) || null,
+                transaction_type: row['Transaction_Type']?.toString(),
+                device_type: row['Device_Type']?.toString(),
+                merchant_category: row['Merchant_Category']?.toString(),
+                country: row['Country']?.toString(),
+                home_country: row['Home_Country']?.toString(),
+                country_risk_level: row['Country_Risk_Level']?.toString(),
+                account_age_days: parseInt(row['Account_Age_Days']) || null,
+                is_new_device: row['Is_New_Device'] === 'TRUE' || row['Is_New_Device'] === true,
+                degree_centrality: parseFloat(row['Degree_Centrality']) || null,
+                path_length_hops: parseInt(row['Path_Length_Hops']) || null,
+                balance_before: parseFloat(row['Balance_Before']) || null,
+                balance_after: parseFloat(row['Balance_After']) || null,
+                days_since_last_transaction: parseFloat(row['Days_Since_Last_Transaction']) || null,
+                avg_user_transaction_amount: parseFloat(row['Avg_User_Transaction_Amount']) || null,
+                user_transaction_count_7d: parseInt(row['User_Transaction_Count_7d']) || null,
+                transaction_frequency_1hr: parseFloat(row['Transaction_Frequency_1hr']) || null,
+                destination_id: row['Destination_ID']?.toString(),
+                is_flagged: false,
+                flagged_reason: null
             }));
 
             setProgress(50);
@@ -138,7 +148,7 @@ export default function IngestionPage() {
                 const { error: deleteError } = await supabase
                     .from('transactions')
                     .delete()
-                    .eq('User_ID', user.id);
+                    .eq('user_id', user.id);
 
                 if (deleteError) throw deleteError;
             }
