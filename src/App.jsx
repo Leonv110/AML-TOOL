@@ -3,8 +3,18 @@ import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import DashboardShell from './pages/DashboardShell';
+import DashboardPage from './pages/DashboardPage';
+import CustomerMaster from './pages/CustomerMaster';
+import CustomerRisk from './pages/CustomerRisk';
+import CustomerDirectory from './pages/CustomerDirectory';
+import CustomerProfile from './pages/CustomerProfile';
+import Screening from './pages/Screening';
+import TransactionMonitoring from './pages/TransactionMonitoring';
+import AlertReview from './pages/AlertReview';
+import Investigations from './pages/Investigations';
+import InvestigationWorkspace from './pages/InvestigationWorkspace';
+import Reports from './pages/Reports';
 import IngestionPage from './pages/IngestionPage';
-import TransactionsTab from './components/TransactionsTab';
 
 function App() {
     return (
@@ -13,30 +23,25 @@ function App() {
                 <Routes>
                     <Route path="/login" element={<LoginPage />} />
                     <Route
-                        path="/dashboard"
                         element={
                             <ProtectedRoute>
                                 <DashboardShell />
                             </ProtectedRoute>
                         }
-                    />
-                    <Route
-                        path="/ingestion"
-                        element={
-                            <ProtectedRoute>
-                                <IngestionPage />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route 
-                        path="/monitoring" 
-                        element={
-                             <ProtectedRoute>
-                                 <TransactionsTab />
-                             </ProtectedRoute>
-                        } 
-                    />
-                    <Route path="*" element={<Navigate to="/login" replace />} />
+                    >
+                        <Route path="/" element={<DashboardPage />} />
+                        <Route path="/customer-master" element={<CustomerMaster />} />
+                        <Route path="/customers" element={<CustomerDirectory />} />
+                        <Route path="/customers/:id" element={<CustomerProfile />} />
+                        <Route path="/screening" element={<Screening />} />
+                        <Route path="/transactions" element={<TransactionMonitoring />} />
+                        <Route path="/alerts" element={<AlertReview />} />
+                        <Route path="/investigations" element={<Investigations />} />
+                        <Route path="/investigations/:case_id" element={<InvestigationWorkspace />} />
+                        <Route path="/reports" element={<Reports />} />
+                        <Route path="/ingestion" element={<IngestionPage />} />
+                    </Route>
+                    <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
             </AuthProvider>
         </BrowserRouter>
