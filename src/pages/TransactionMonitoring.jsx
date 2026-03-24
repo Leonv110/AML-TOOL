@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../supabaseClient';
 import { fetchAllTransactions, fetchRules, toggleRuleStatus, fetchAlertCountForRule } from '../services/dataService';
 import './pages.css';
 
@@ -25,12 +26,15 @@ export default function TransactionMonitoring() {
       setTransactions(txns);
 
       // Enrich rules with live alert counts
-      const enrichedRules = await Promise.all(
-        ruleData.map(async (rule) => {
-          const count = await fetchAlertCountForRule(rule.name);
-          return { ...rule, liveAlertCount: count };
-        })
-      );
+      const { data: alertData } = await supabase.from('alerts').select('rule_triggered');
+      let counts = {};
+      if (alertData) {
+        counts = alertData.reduce((acc, alert) => {
+          acc[alert.rule_triggered] = (acc[alert.rule_triggered] || 0) + 1;
+          return acc;
+        }, {});
+      }
+      const enrichedRules = ruleData.map(rule => ({ ...rule, liveAlertCount: counts[rule.name] || 0 }));
       setRules(enrichedRules);
 
       // Extract unique countries

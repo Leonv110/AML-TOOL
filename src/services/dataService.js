@@ -183,7 +183,8 @@ export async function fetchTransactionsForCustomer(customerId) {
     .from('transactions')
     .select('*')
     .eq('customer_id', customerId)
-    .order('transaction_date', { ascending: false });
+    .order('transaction_date', { ascending: false })
+    .limit(50);
   if (error) throw error;
   return data || [];
 }
@@ -199,7 +200,7 @@ export async function fetchAllTransactions(filters = {}) {
   if (filters.country) query = query.eq('country', filters.country);
   if (filters.rule) query = query.ilike('rule_triggered', `%${filters.rule}%`);
 
-  query = query.order('transaction_date', { ascending: false });
+  query = query.order('transaction_date', { ascending: false }).limit(50);
   const { data, error } = await query;
   if (error) throw error;
   return data || [];
@@ -210,8 +211,8 @@ export async function fetchAllTransactions(filters = {}) {
 // ============================================================
 export async function fetchAlerts(statusFilter) {
   if (!supabase) return [];
-  let query = supabase.from('alerts').select('*').order('created_at', { ascending: false });
-  if (statusFilter) query = query.eq('status', statusFilter);
+  let query = supabase.from('alerts').select('*').order('created_at', { ascending: false }).limit(50);
+  if (statusFilter && statusFilter !== 'all') query = query.eq('status', statusFilter);
   const { data, error } = await query;
   if (error) throw error;
   return data || [];
@@ -363,4 +364,67 @@ export async function fetchDistinctCountries() {
   if (error) return [];
   const unique = [...new Set((data || []).map(d => d.country).filter(Boolean))];
   return unique.sort();
+}
+
+// ============================================================
+// AML Rule Generation (Added for Issue 2 & 3)
+// ============================================================
+
+export function applyAMLRules(transaction, activeRuleNames) {
+  if (activeRuleNames.has('Geographic Risk') && (transaction.country_risk_level === 'High' || transaction.country_risk_level === 'HIGH')) {
+    return { triggered: true, rule_name: 'Geographic Risk', severity: 'HIGH' };
+  }
+  if (activeRuleNames.has('Velocity Spike') && transaction.transaction_frequency_1hr > 5) {
+    return { triggered: true, rule_name: 'Velocity Spike', severity: 'HIGH' };
+  }
+  if (activeRuleNames.has('Dormancy Activation') && transaction.days_since_last_transaction > 30) {
+    return { triggered: true, rule_name: 'Dormancy Activation', severity: 'MEDIUM' };
+  }
+  if (activeRuleNames.has('Structuring') && transaction.amount > 9000 && transaction.amount < 10000) {
+    return { triggered: true, rule_name: 'Structuring', severity: 'HIGH' };
+  }
+  if (activeRuleNames.has('New Device') && transaction.is_new_device) {
+    return { triggered: true, rule_name: 'New Device', severity: 'MEDIUM' };
+  }
+  return { triggered: false };
+}
+
+export async function generateAlertsFromTransactions(transactions) {
+  if (!supabase) return 0;
+  
+  const { data: activeRules } = await supabase
+    .from('rules')
+    .select('name')
+    .eq('status', 'active');
+    
+  const activeRuleNames = new Set((activeRules || []).map(r => r.name));
+  const alertsToInsert = [];
+  
+  for (const txn of transactions) {
+    const ruleResult = applyAMLRules(txn, activeRuleNames);
+    if (ruleResult.triggered) {
+      alertsToInsert.push({
+        alert_id: `ALT-${Date.now()}-${Math.random().toString(36).substr(2,6).toUpperCase()}`,
+        customer_id: txn.customer_id || txn.user_id,
+        customer_name: txn.customer_name || `Customer ${txn.customer_id || txn.user_id}`,
+        risk_level: ruleResult.severity,
+        rule_triggered: ruleResult.rule_name,
+        status: 'open',
+        transaction_id: txn.transaction_id,
+        amount: txn.amount,
+        country: txn.country,
+        created_at: new Date().toISOString()
+      });
+    }
+  }
+  
+  if (alertsToInsert.length > 0) {
+    // Batch insert in chunks of 100
+    for (let i = 0; i < alertsToInsert.length; i += 100) {
+      const chunk = alertsToInsert.slice(i, i + 100);
+      await supabase.from('alerts').insert(chunk);
+    }
+  }
+  
+  return alertsToInsert.length;
 }
