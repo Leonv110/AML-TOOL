@@ -284,3 +284,127 @@
     border-top: 1px solid #1e293b;
     font-style: italic;
 }
+
+.aml-processing-section {
+  background: #0d1117;
+  border: 1px solid #1e293b;
+  border-top: 2px solid #f59e0b;
+  padding: 24px;
+  margin-top: 16px;
+}
+
+.aml-processing-header h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #f1f5f9;
+  margin-bottom: 6px;
+}
+
+.aml-processing-header p {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-bottom: 16px;
+}
+
+.aml-run-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: #f59e0b;
+  color: #050709;
+  border: none;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  letter-spacing: 0.02em;
+}
+
+.aml-run-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.aml-run-button:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(5,7,9,0.3);
+  border-top-color: #050709;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.aml-progress {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.aml-success {
+  background: rgba(34,197,94,0.05);
+  border: 1px solid rgba(34,197,94,0.2);
+  padding: 16px;
+  margin-top: 12px;
+}
+
+.aml-result-header {
+  font-size: 13px;
+  font-weight: 700;
+  color: #22c55e;
+  margin-bottom: 12px;
+}
+
+.aml-result-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.aml-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.aml-stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #f1f5f9;
+  font-family: monospace;
+}
+
+.aml-stat-label {
+  font-size: 10px;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.aml-error {
+  background: rgba(239,68,68,0.05);
+  border: 1px solid rgba(239,68,68,0.2);
+  padding: 14px 16px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: #ef4444;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.aml-retry-button {
+  padding: 6px 14px;
+  background: transparent;
+  border: 1px solid rgba(239,68,68,0.4);
+  color: #ef4444;
+  font-size: 11px;
+  cursor: pointer;
+}

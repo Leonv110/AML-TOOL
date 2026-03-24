@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
+import { generateAlertsFromTransactions } from '../services/dataService';
 import * as XLSX from 'xlsx';
 import './IngestionPage.css';
 
@@ -10,6 +11,13 @@ export default function IngestionPage() {
     const { user } = useAuth();
     const [mode, setMode] = useState('append'); // 'append' or 'replace'
     const [file, setFile] = useState(null);
+    const [uploadComplete, setUploadComplete] = useState(false);
+    const [uploadedBatchId, setUploadedBatchId] = useState(null);
+    const [amlProcessing, setAmlProcessing] = useState(false);
+    const [amlResult, setAmlResult] = useState(null);
+    const [amlError, setAmlError] = useState(null);
+    const [amlProgress, setAmlProgress] = useState(0);
+    const [amlProgressMsg, setAmlProgressMsg] = useState('');
     const [uploading, setUploading] = useState(false);
     const [progress, setProgress] = useState(0);
     const [status, setStatus] = useState(null);
@@ -135,7 +143,7 @@ export default function IngestionPage() {
                 transaction_frequency_1hr:    parseFloat(row['transaction_frequency_1hr']) || null,
                 destination_id:               row['destination_id']?.toString() || null,
                 // AML output columns — always start clean; aml_processor.py will populate these
-                flagged:                      false,
+                flagged:                      null,
                 flag_reason:                  null,
                 rule_triggered:               null,
                 risk_score:                   null,
@@ -172,6 +180,8 @@ export default function IngestionPage() {
 
             setProgress(100);
             setStatus({ type: 'success', message: `Successfully ingested ${formattedData.length} records.` });
+            setUploadComplete(true);
+            setUploadedBatchId(null);
             setFile(null);
             setPreview(null);
 
@@ -194,7 +204,60 @@ export default function IngestionPage() {
         setProgress(0);
     };
 
-    return (
+    async function handleRunAMLProcessing() {
+    setAmlProcessing(true);
+    setAmlResult(null);
+    setAmlError(null);
+    setAmlProgress(0);
+    setAmlProgressMsg("Starting...");
+
+    try {
+      const backendUrl = import.meta.env.VITE_AML_BACKEND_URL || 'http://localhost:8000';
+      
+      const response = await fetch(`${backendUrl}/api/aml/process`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ batch_id: uploadedBatchId })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'AML processing failed');
+      }
+
+      const data = await response.json();
+      const taskId = data.task_id;
+
+      const pollInterval = setInterval(async () => {
+         try {
+             const res = await fetch(`${backendUrl}/api/aml/progress/${taskId}`);
+             if (!res.ok) return;
+             const d = await res.json();
+             
+             setAmlProgress(d.progress);
+             setAmlProgressMsg(d.message);
+             
+             if (d.status === "completed") {
+                 clearInterval(pollInterval);
+                 setAmlResult(d.results);
+                 setAmlProcessing(false);
+             } else if (d.status === "failed") {
+                 clearInterval(pollInterval);
+                 setAmlError(d.error || "Unknown processing error");
+                 setAmlProcessing(false);
+             }
+         } catch (e) {
+             console.error("Polling error:", e);
+         }
+      }, 400);
+
+    } catch (err) {
+      setAmlError(err.message || "AML backend not running. Start the backend with: cd backend && uvicorn main:app --reload");
+      setAmlProcessing(false);
+    }
+  }
+
+  return (
         <div className="ingestion-container">
             <header className="ingestion-header">
                 <div className="header-content">
@@ -361,6 +424,96 @@ export default function IngestionPage() {
                     </button>
                 </div>
             </div>
+
+            {uploadComplete && (
+              <div className="aml-processing-section">
+                <div className="aml-processing-header">
+                  <h3>Step 2 — Run AML Processing</h3>
+                  <p>
+                    Data uploaded successfully. Click below to run the AML rule engine — 
+                    this will flag suspicious transactions, compute risk scores, and generate alerts.
+                  </p>
+                </div>
+
+                {!amlResult && !amlError && (
+                  <button
+                    onClick={handleRunAMLProcessing}
+                    disabled={amlProcessing}
+                    className="aml-run-button"
+                  >
+                    {amlProcessing ? (
+                      <>
+                        <span className="spinner" />
+                        Running AML Processing...
+                      </>
+                    ) : (
+                      <>
+                        ⚡ Run AML Processing
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {amlProcessing && (
+                  <div className="aml-progress-container" style={{ marginTop: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <span style={{ fontWeight: '600', color: '#f59e0b', fontSize: '13px' }}>
+                        {amlProgressMsg}
+                      </span>
+                      <span style={{ color: '#94a3b8', fontSize: '12px' }}>{amlProgress}%</span>
+                    </div>
+                    <div style={{ width: '100%', backgroundColor: '#1e293b', borderRadius: '4px', height: '6px', overflow: 'hidden', marginBottom: '8px' }}>
+                      <div style={{ width: `${amlProgress}%`, backgroundColor: '#f59e0b', height: '100%', transition: 'width 0.3s ease' }}></div>
+                    </div>
+                    <p style={{ fontSize: '12px', color: '#94a3b8' }}>
+                      Processing transactions against 5 AML rules...
+                    </p>
+                  </div>
+                )}
+
+                {amlResult && (
+                  <div className="aml-success">
+                    <div className="aml-result-header">✅ AML Processing Complete</div>
+                    <div className="aml-result-grid">
+                      <div className="aml-stat">
+                        <span className="aml-stat-value">{amlResult.processed?.toLocaleString()}</span>
+                        <span className="aml-stat-label">Transactions Processed</span>
+                      </div>
+                      <div className="aml-stat">
+                        <span className="aml-stat-value" style={{ color: '#ef4444' }}>
+                          {amlResult.flagged?.toLocaleString()}
+                        </span>
+                        <span className="aml-stat-label">Flagged</span>
+                      </div>
+                      <div className="aml-stat">
+                        <span className="aml-stat-value" style={{ color: '#f59e0b' }}>
+                          {amlResult.alerts_created?.toLocaleString()}
+                        </span>
+                        <span className="aml-stat-label">Alerts Created</span>
+                      </div>
+                      <div className="aml-stat">
+                        <span className="aml-stat-value">
+                          {amlResult.duration_seconds?.toFixed(1)}s
+                        </span>
+                        <span className="aml-stat-label">Duration</span>
+                      </div>
+                    </div>
+                    <p style={{ fontSize: '12px', color: '#94a3b8', marginTop: '12px' }}>
+                      View results in Alert Review and Transaction Monitoring
+                    </p>
+                  </div>
+                )}
+
+                {amlError && (
+                  <div className="aml-error">
+                    <div>⚠️ Processing failed: {amlError}</div>
+                    <button onClick={handleRunAMLProcessing} className="aml-retry-button">
+                      Retry
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
         </div>
     );
 }

@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
-import { fetchDashboardKPIs, fetchHighRiskCount, computeRiskScore } from '../services/dataService';
 import './pages.css';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const [kpis, setKpis] = useState({ totalCustomers: 0, highRisk: 0, openAlerts: 0, openSAR: 0 });
+  const [stats, setStats] = useState({ total: 0, highRisk: 0, openAlerts: 0, openSAR: 0 });
   const [alerts, setAlerts] = useState([]);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -18,22 +17,56 @@ export default function DashboardPage() {
   async function loadDashboard() {
     setLoading(true);
     try {
-      const baseKpis = await fetchDashboardKPIs();
-      const highRisk = await fetchHighRiskCount();
-      setKpis({ ...baseKpis, highRisk });
+      const [customersRes, highRiskRes, openAlertsRes, openSARRes] = await Promise.all([
+        supabase.from('customers').select('*', { count: 'exact', head: true }),
+        supabase.from('customers').select('*', { count: 'exact', head: true }).eq('risk_tier', 'HIGH'),
+        supabase.from('alerts').select('*', { count: 'exact', head: true }).eq('status', 'open'),
+        supabase.from('investigations').select('*', { count: 'exact', head: true }).eq('status', 'draft_sar')
+      ]);
+      
+      setStats({
+        total: customersRes.count || 0,
+        highRisk: highRiskRes.count || 0,
+        openAlerts: openAlertsRes.count || 0,
+        openSAR: openSARRes.count || 0
+      });
 
-      // Fetch recent alerts
+      // Fetch Student Performance
       if (supabase) {
-        const { data: alertData } = await supabase
-          .from('alerts')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(10);
-        setAlerts(alertData || []);
+        const [{ data: studentAlerts }, { data: studentInvs }] = await Promise.all([
+          supabase.from('alerts').select('assigned_to, status, created_at, updated_at').neq('status', 'open'),
+          supabase.from('investigations').select('assigned_to, status')
+        ]);
+        
+        const perfMap = {};
+        (studentAlerts || []).forEach(a => {
+           if (!a.assigned_to) return;
+           if (!perfMap[a.assigned_to]) perfMap[a.assigned_to] = { alertsReviewed: 0, correctEscalations: 0, totalEscalations: 0, totalTime: 0 };
+           perfMap[a.assigned_to].alertsReviewed++;
+           
+           const created = new Date(a.created_at).getTime();
+           const updated = new Date(a.updated_at || a.created_at).getTime();
+           perfMap[a.assigned_to].totalTime += (updated - created) / 60000; // in mins
+        });
+        
+        (studentInvs || []).forEach(inv => {
+           if (!inv.assigned_to) return;
+           if (!perfMap[inv.assigned_to]) perfMap[inv.assigned_to] = { alertsReviewed: 0, correctEscalations: 0, totalEscalations: 0, totalTime: 0 };
+           perfMap[inv.assigned_to].totalEscalations++;
+           if (inv.status === 'closed_false_positive' || inv.status === 'draft_sar') {
+              perfMap[inv.assigned_to].correctEscalations++;
+           }
+        });
+        
+        const studentData = Object.entries(perfMap).map(([id, data]) => ({
+           name: id.substring(0, 8),
+           alertsReviewed: data.alertsReviewed,
+           accuracy: data.totalEscalations > 0 ? Math.round((data.correctEscalations / data.totalEscalations) * 100) : 0,
+           avgTime: data.alertsReviewed > 0 ? Math.round(data.totalTime / data.alertsReviewed) : 0
+        }));
+        
+        setStudents(studentData);
       }
-
-      // Student performance placeholder
-      setStudents([]);
     } catch (err) {
       // Silently handle errors for dashboard
     } finally {
@@ -79,19 +112,19 @@ export default function DashboardPage() {
       <div className="kpi-grid">
         <div className="kpi-card" onClick={() => navigate('/customers')} role="button" tabIndex={0} aria-label="Total Customers">
           <div className="kpi-label">Total Customers</div>
-          <div className="kpi-value">{kpis.totalCustomers}</div>
+          <div className="kpi-value">{stats.total}</div>
         </div>
         <div className="kpi-card high" onClick={() => navigate('/customers')} role="button" tabIndex={0} aria-label="High Risk Customers">
           <div className="kpi-label">High Risk</div>
-          <div className="kpi-value">{kpis.highRisk}</div>
+          <div className="kpi-value">{stats.highRisk}</div>
         </div>
         <div className="kpi-card alert" onClick={() => navigate('/alerts')} role="button" tabIndex={0} aria-label="Open Alerts">
           <div className="kpi-label">Open Alerts</div>
-          <div className="kpi-value">{kpis.openAlerts}</div>
+          <div className="kpi-value">{stats.openAlerts}</div>
         </div>
         <div className="kpi-card sar" onClick={() => navigate('/investigations')} role="button" tabIndex={0} aria-label="Open SAR">
           <div className="kpi-label">Open SAR</div>
-          <div className="kpi-value">{kpis.openSAR}</div>
+          <div className="kpi-value">{stats.openSAR}</div>
         </div>
       </div>
 

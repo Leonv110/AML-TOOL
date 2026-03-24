@@ -18,8 +18,11 @@ export default function Reports() {
   async function loadReportData() {
     setLoading(true);
     try {
-      const alerts = await fetchAlerts();
-      const investigations = await fetchInvestigations();
+      const [alerts, investigations, customers] = await Promise.all([
+        fetchAlerts(),
+        fetchInvestigations(),
+        fetchAllCustomers()
+      ]);
 
       // Chart 1: High Risk Customer Trend
       const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -53,7 +56,6 @@ export default function Reports() {
       });
 
       // Build from customers
-      const customers = await fetchAllCustomers();
       customers.forEach(c => {
         const country = c.country || 'Unknown';
         if (!countryMap[country]) countryMap[country] = { country, count: 0, risk: 'low' };
@@ -218,17 +220,57 @@ export default function Reports() {
         </div>
       </div>
 
-      {/* Power BI / Tableau Placeholder */}
-      <div className="powerbi-placeholder">
-        {/* TODO: Paste Kanwaljeet's Power BI or Tableau embed URL below */}
-        {/* Replace the src="" with the embed URL she provides */}
-        {/* <iframe src="" width="100%" height="600" frameBorder="0" title="Power BI Dashboard" /> */}
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" style={{ opacity: 0.3, marginBottom: '1rem' }}>
-          <rect x="2" y="3" width="20" height="14" rx="2" />
-          <line x1="8" y1="21" x2="16" y2="21" />
-          <line x1="12" y1="17" x2="12" y2="21" />
-        </svg>
-        <p>Power BI / Tableau dashboard will appear here once embed URL is provided.</p>
+      {/* Power BI / Tableau Embed */}
+      <PowerBIEmbed />
+    </div>
+  );
+}
+
+function PowerBIEmbed() {
+  const envUrl = import.meta.env.VITE_POWERBI_EMBED_URL;
+  const [embedUrl, setEmbedUrl] = useState(envUrl || '');
+  const [activeUrl, setActiveUrl] = useState(envUrl || '');
+
+  if (activeUrl) {
+    return (
+      <div style={{ width: '100%', marginTop: '1.5rem', background: '#0d1117', borderRadius: '8px', overflow: 'hidden', border: '1px solid #1e293b' }}>
+        <iframe
+          src={activeUrl}
+          width="100%"
+          height="600px"
+          frameBorder="0"
+          allowFullScreen
+          title="Power BI Dashboard"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="powerbi-placeholder" style={{ marginTop: '1.5rem', background: '#0f172a', padding: '2rem', borderRadius: '8px', border: '1px dashed #334155', textAlign: 'center' }}>
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" style={{ opacity: 0.3, marginBottom: '1rem', color: '#94a3b8' }}>
+        <rect x="2" y="3" width="20" height="14" rx="2" />
+        <line x1="8" y1="21" x2="16" y2="21" />
+        <line x1="12" y1="17" x2="12" y2="21" />
+      </svg>
+      <p style={{ margin: '0 0 0.5rem', fontWeight: 600, color: '#f1f5f9' }}>Power BI / Tableau Dashboard</p>
+      <p style={{ fontSize: '12px', color: '#94a3b8', margin: '0 0 1rem' }}>
+        Paste embed URL below to display dashboard
+      </p>
+      <div style={{ display: 'flex', gap: '8px', maxWidth: '600px', margin: '0 auto' }}>
+        <input
+          type="url"
+          value={embedUrl}
+          onChange={(e) => setEmbedUrl(e.target.value)}
+          placeholder="Paste Power BI or Tableau embed URL here..."
+          style={{ flex: 1, padding: '10px 12px', background: '#0d1117', border: '1px solid #1e293b', color: '#f1f5f9', fontSize: '13px', borderRadius: '4px' }}
+        />
+        <button
+          onClick={() => setActiveUrl(embedUrl)}
+          style={{ padding: '10px 16px', background: '#f59e0b', color: '#050709', fontWeight: '700', border: 'none', cursor: 'pointer', borderRadius: '4px' }}
+        >
+          Load Dashboard
+        </button>
       </div>
     </div>
   );

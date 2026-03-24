@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../supabaseClient';
 import { fetchInvestigations } from '../services/dataService';
 import './pages.css';
 
@@ -8,6 +9,7 @@ export default function Investigations() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [investigations, setInvestigations] = useState([]);
+  const [myInvestigations, setMyInvestigations] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -17,8 +19,16 @@ export default function Investigations() {
   async function loadInvestigations() {
     setLoading(true);
     try {
-      const data = await fetchInvestigations();
-      setInvestigations(data);
+      const { data: authData } = await supabase.auth.getUser();
+      const currentUser = authData?.user;
+      
+      const [allCasesRes, myCasesRes] = await Promise.all([
+        supabase.from('investigations').select('*').order('created_at', { ascending: false }).limit(50),
+        supabase.from('investigations').select('*').eq('assigned_to', currentUser?.id).order('created_at', { ascending: false }).limit(50)
+      ]);
+      
+      setInvestigations(allCasesRes.data || []);
+      setMyInvestigations(myCasesRes.data || []);
     } catch (err) {
       // Handle silently
     } finally {
@@ -40,7 +50,7 @@ export default function Investigations() {
     URL.revokeObjectURL(url);
   }
 
-  const myAssigned = investigations.filter(inv => inv.assigned_to === user?.id);
+
 
   const renderTable = (data, title) => (
     <div className="card" style={{ marginBottom: '1.5rem' }}>
@@ -136,7 +146,7 @@ export default function Investigations() {
       ) : (
         <>
           {renderTable(investigations, 'All Cases')}
-          {renderTable(myAssigned, 'My Assigned Cases')}
+          {renderTable(myInvestigations, 'My Assigned Cases')}
         </>
       )}
     </div>
