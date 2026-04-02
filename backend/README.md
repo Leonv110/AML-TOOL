@@ -1,24 +1,26 @@
-## GAFA AML Backend — Deployment
+# GAFA AML Processing Backend
 
-### Local development
-cd backend
+FastAPI backend for running AML rule processing against PostgreSQL (Neon).
+
+## Setup
+
+```bash
+# Fill in DATABASE_URL in .env
+cp .env.example .env  # or edit .env directly
+
+# Install dependencies
 pip install -r requirements.txt
-cp .env.example .env
-# Fill in SUPABASE_URL and SUPABASE_SERVICE_KEY in .env
-uvicorn main:app --reload --port 8000
 
-### Deploy to Railway
-1. Go to railway.app → New Project → Deploy from GitHub
-2. Set root directory to /backend
-3. Add environment variables:
-   - SUPABASE_URL = your project URL
-   - SUPABASE_SERVICE_KEY = your service role key (Settings → API → service_role)
-4. Railway auto-detects the Dockerfile and deploys
-5. Copy the Railway URL (e.g. https://gafa-backend.railway.app)
-6. Add to Vercel environment variables:
-   - VITE_AML_BACKEND_URL = https://gafa-backend.railway.app
-7. Redeploy Vercel frontend
+# Environment variables:
+#   DATABASE_URL = your Neon PostgreSQL connection string
 
-### Important: Use SERVICE_ROLE key not ANON key
-The service role key bypasses RLS and is required for batch processing.
-Never expose it in the frontend — only use it in the backend .env file.
+# Run
+uvicorn main:app --reload
+```
+
+## Endpoints
+
+- `POST /api/aml/process` — Start AML processing
+- `GET /api/aml/progress/{task_id}` — Check processing progress
+- `GET /api/aml/status` — Check unprocessed transaction count
+- `GET /health` — Health check

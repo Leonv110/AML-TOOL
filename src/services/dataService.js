@@ -1,7 +1,7 @@
-import { supabase } from '../supabaseClient';
+import { apiGet, apiPost, apiPut, apiPatch } from '../apiClient';
 
 // ============================================================
-// computeRiskScore — Core risk scoring function
+// computeRiskScore — Core risk scoring function (pure, no DB)
 // ============================================================
 export function computeRiskScore(customer, transactions = []) {
   let country_risk = 0;
@@ -103,267 +103,155 @@ export function computeRiskScore(customer, transactions = []) {
 // Dashboard KPI Queries
 // ============================================================
 export async function fetchDashboardKPIs() {
-  const results = { totalCustomers: 0, highRisk: 0, openAlerts: 0, openSAR: 0 };
-
-  if (!supabase) return results;
-
-  const [custRes, alertRes, sarRes] = await Promise.all([
-    supabase.from('customers').select('id', { count: 'exact', head: true }),
-    supabase.from('alerts').select('id', { count: 'exact', head: true }).eq('status', 'open'),
-    supabase.from('investigations').select('id', { count: 'exact', head: true }).eq('status', 'draft_sar'),
-  ]);
-
-  results.totalCustomers = custRes.count || 0;
-  results.openAlerts = alertRes.count || 0;
-  results.openSAR = sarRes.count || 0;
-
-  return results;
+  try {
+    return await apiGet('/api/dashboard/kpis');
+  } catch {
+    return { totalCustomers: 0, highRisk: 0, openAlerts: 0, openSAR: 0 };
+  }
 }
 
 export async function fetchHighRiskCount() {
-  if (!supabase) return 0;
-  const { data: customers } = await supabase.from('customers').select('*');
-  if (!customers) return 0;
+  try {
+    const customers = await apiGet('/api/customers');
+    if (!customers || customers.length === 0) return 0;
 
-  let highCount = 0;
-  for (const cust of customers) {
-    const { data: txns } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('customer_id', cust.customer_id);
-    const result = computeRiskScore(cust, txns || []);
-    if (result.score >= 66) highCount++;
+    let highCount = 0;
+    for (const cust of customers) {
+      const txns = await apiGet(`/api/transactions/customer/${cust.customer_id}`);
+      const result = computeRiskScore(cust, txns || []);
+      if (result.score >= 66) highCount++;
+    }
+    return highCount;
+  } catch {
+    return 0;
   }
-  return highCount;
 }
 
 // ============================================================
 // Customer Queries
 // ============================================================
 export async function fetchAllCustomers() {
-  if (!supabase) return [];
-  const { data, error } = await supabase
-    .from('customers')
-    .select('*')
-    .order('created_at', { ascending: false });
-  if (error) throw error;
-  return data || [];
+  return apiGet('/api/customers');
 }
 
 export async function fetchCustomerById(customerId) {
-  if (!supabase) return null;
-  const { data, error } = await supabase
-    .from('customers')
-    .select('*')
-    .eq('customer_id', customerId)
-    .maybeSingle();
-  if (error) throw error;
-  return data;
+  return apiGet(`/api/customers/${customerId}`);
 }
 
 export async function upsertCustomers(rows) {
-  if (!supabase) throw new Error('Supabase not configured');
-  const batchSize = 500;
-  let inserted = 0;
-  for (let i = 0; i < rows.length; i += batchSize) {
-    const batch = rows.slice(i, i + batchSize);
-    const { error } = await supabase.from('customers').upsert(batch, { onConflict: 'customer_id' });
-    if (error) throw error;
-    inserted += batch.length;
-  }
-  return inserted;
+  const result = await apiPut('/api/customers/upsert', rows);
+  return result.inserted;
 }
 
 // ============================================================
 // Transaction Queries
 // ============================================================
 export async function fetchTransactionsForCustomer(customerId) {
-  if (!supabase) return [];
-  const { data, error } = await supabase
-    .from('transactions')
-    .select('*')
-    .eq('customer_id', customerId)
-    .order('transaction_date', { ascending: false })
-    .limit(50);
-  if (error) throw error;
-  return data || [];
+  return apiGet(`/api/transactions/customer/${customerId}`);
 }
 
 export async function fetchAllTransactions(filters = {}) {
-  if (!supabase) return [];
-  let query = supabase.from('transactions').select('*');
+  const params = new URLSearchParams();
+  if (filters.startDate) params.set('startDate', filters.startDate);
+  if (filters.endDate) params.set('endDate', filters.endDate);
+  if (filters.minAmount) params.set('minAmount', filters.minAmount);
+  if (filters.maxAmount) params.set('maxAmount', filters.maxAmount);
+  if (filters.country) params.set('country', filters.country);
+  if (filters.rule) params.set('rule', filters.rule);
 
-  if (filters.startDate) query = query.gte('transaction_date', filters.startDate);
-  if (filters.endDate) query = query.lte('transaction_date', filters.endDate);
-  if (filters.minAmount) query = query.gte('amount', parseFloat(filters.minAmount));
-  if (filters.maxAmount) query = query.lte('amount', parseFloat(filters.maxAmount));
-  if (filters.country) query = query.eq('country', filters.country);
-  if (filters.rule) query = query.ilike('rule_triggered', `%${filters.rule}%`);
-
-  query = query.order('transaction_date', { ascending: false }).limit(50);
-  const { data, error } = await query;
-  if (error) throw error;
-  return data || [];
+  const qs = params.toString();
+  return apiGet(`/api/transactions${qs ? `?${qs}` : ''}`);
 }
 
 // ============================================================
 // Alert Queries
 // ============================================================
 export async function fetchAlerts(statusFilter) {
-  if (!supabase) return [];
-  let query = supabase.from('alerts').select('*').order('created_at', { ascending: false }).limit(50);
-  if (statusFilter && statusFilter !== 'all') query = query.eq('status', statusFilter);
-  const { data, error } = await query;
-  if (error) throw error;
-  return data || [];
+  const qs = statusFilter && statusFilter !== 'all' ? `?status=${statusFilter}` : '';
+  return apiGet(`/api/alerts${qs}`);
 }
 
 export async function fetchAlertsForCustomer(customerId) {
-  if (!supabase) return [];
-  const { data, error } = await supabase
-    .from('alerts')
-    .select('*')
-    .eq('customer_id', customerId)
-    .order('created_at', { ascending: false });
-  if (error) throw error;
-  return data || [];
+  return apiGet(`/api/alerts/customer/${customerId}`);
 }
 
 export async function updateAlertStatus(alertId, status, caseId = null) {
-  if (!supabase) return;
-  const update = { status };
-  if (caseId) update.case_id = caseId;
-  const { error } = await supabase.from('alerts').update(update).eq('alert_id', alertId);
-  if (error) throw error;
+  return apiPatch(`/api/alerts/${alertId}/status`, { status, case_id: caseId });
 }
 
 // ============================================================
 // Rules Queries
 // ============================================================
 export async function fetchRules() {
-  if (!supabase) return [];
-  const { data, error } = await supabase.from('rules').select('*').order('created_at', { ascending: true });
-  if (error) throw error;
-  return data || [];
+  return apiGet('/api/rules');
 }
 
 export async function toggleRuleStatus(ruleId, newStatus) {
-  if (!supabase) return;
-  const { error } = await supabase.from('rules').update({ status: newStatus }).eq('id', ruleId);
-  if (error) throw error;
+  return apiPatch(`/api/rules/${ruleId}/status`, { status: newStatus });
 }
 
 export async function fetchAlertCountForRule(ruleName) {
-  if (!supabase) return 0;
-  const { count, error } = await supabase
-    .from('alerts')
-    .select('id', { count: 'exact', head: true })
-    .eq('rule_triggered', ruleName);
-  if (error) return 0;
-  return count || 0;
+  const result = await apiGet(`/api/alerts/count/${encodeURIComponent(ruleName)}`);
+  return result.count || 0;
 }
 
 // ============================================================
 // Document Queries
 // ============================================================
 export async function fetchDocumentsForCustomer(customerId) {
-  if (!supabase) return [];
-  const { data, error } = await supabase
-    .from('documents')
-    .select('*')
-    .eq('customer_id', customerId)
-    .order('uploaded_at', { ascending: false });
-  if (error) throw error;
-  return data || [];
+  return apiGet(`/api/documents/customer/${customerId}`);
 }
 
 export async function uploadDocument(doc) {
-  if (!supabase) throw new Error('Supabase not configured');
-  const { error } = await supabase.from('documents').insert(doc);
-  if (error) throw error;
+  return apiPost('/api/documents', doc);
 }
 
 // ============================================================
 // Notes Queries
 // ============================================================
 export async function fetchNotesForCustomer(customerId) {
-  if (!supabase) return [];
-  const { data, error } = await supabase
-    .from('notes')
-    .select('*')
-    .eq('customer_id', customerId)
-    .order('created_at', { ascending: false });
-  if (error) throw error;
-  return data || [];
+  return apiGet(`/api/notes/customer/${customerId}`);
 }
 
 export async function saveNote(note) {
-  if (!supabase) throw new Error('Supabase not configured');
-  const { error } = await supabase.from('notes').insert(note);
-  if (error) throw error;
+  return apiPost('/api/notes', note);
 }
 
 // ============================================================
 // Investigation Queries
 // ============================================================
 export async function fetchInvestigations() {
-  if (!supabase) return [];
-  const { data, error } = await supabase
-    .from('investigations')
-    .select('*')
-    .order('created_at', { ascending: false });
-  if (error) throw error;
-  return data || [];
+  return apiGet('/api/investigations');
 }
 
 export async function fetchInvestigationByCaseId(caseId) {
-  if (!supabase) return null;
-  const { data, error } = await supabase
-    .from('investigations')
-    .select('*')
-    .eq('case_id', caseId)
-    .maybeSingle();
-  if (error) throw error;
-  return data;
+  return apiGet(`/api/investigations/case/${caseId}`);
 }
 
 export async function updateInvestigation(id, updates) {
-  if (!supabase) return;
-  const { error } = await supabase
-    .from('investigations')
-    .update({ ...updates, updated_at: new Date().toISOString() })
-    .eq('id', id);
-  if (error) throw error;
+  return apiPatch(`/api/investigations/${id}`, updates);
 }
 
 export async function createInvestigation(investigation) {
-  if (!supabase) throw new Error('Supabase not configured');
-  const { data, error } = await supabase.from('investigations').insert(investigation).select().single();
-  if (error) throw error;
-  return data;
+  return apiPost('/api/investigations', investigation);
 }
 
 // ============================================================
 // Customer PEP update
 // ============================================================
 export async function updateCustomerPEP(customerId, pepFlag) {
-  if (!supabase) return;
-  const { error } = await supabase
-    .from('customers')
-    .update({ pep_flag: pepFlag })
-    .eq('customer_id', customerId);
-  if (error) throw error;
+  return apiPatch(`/api/customers/${customerId}/pep`, { pep_flag: pepFlag });
 }
 
 // ============================================================
 // Utility: get distinct countries from customers
 // ============================================================
 export async function fetchDistinctCountries() {
-  if (!supabase) return [];
-  const { data, error } = await supabase.from('customers').select('country');
-  if (error) return [];
-  const unique = [...new Set((data || []).map(d => d.country).filter(Boolean))];
-  return unique.sort();
+  try {
+    return await apiGet('/api/customers/countries');
+  } catch {
+    return [];
+  }
 }
 
 // ============================================================
@@ -390,41 +278,35 @@ export function applyAMLRules(transaction, activeRuleNames) {
 }
 
 export async function generateAlertsFromTransactions(transactions) {
-  if (!supabase) return 0;
-  
-  const { data: activeRules } = await supabase
-    .from('rules')
-    .select('name')
-    .eq('status', 'active');
-    
-  const activeRuleNames = new Set((activeRules || []).map(r => r.name));
-  const alertsToInsert = [];
-  
-  for (const txn of transactions) {
-    const ruleResult = applyAMLRules(txn, activeRuleNames);
-    if (ruleResult.triggered) {
-      alertsToInsert.push({
-        alert_id: `ALT-${Date.now()}-${Math.random().toString(36).substr(2,6).toUpperCase()}`,
-        customer_id: txn.customer_id || txn.user_id,
-        customer_name: txn.customer_name || `Customer ${txn.customer_id || txn.user_id}`,
-        risk_level: ruleResult.severity,
-        rule_triggered: ruleResult.rule_name,
-        status: 'open',
-        transaction_id: txn.transaction_id,
-        amount: txn.amount,
-        country: txn.country,
-        created_at: new Date().toISOString()
-      });
+  try {
+    const activeRules = await apiGet('/api/rules');
+    const activeRuleNames = new Set((activeRules || []).filter(r => r.status === 'active').map(r => r.name));
+    const alertsToInsert = [];
+
+    for (const txn of transactions) {
+      const ruleResult = applyAMLRules(txn, activeRuleNames);
+      if (ruleResult.triggered) {
+        alertsToInsert.push({
+          alert_id: `ALT-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+          customer_id: txn.customer_id || txn.user_id,
+          customer_name: txn.customer_name || `Customer ${txn.customer_id || txn.user_id}`,
+          risk_level: ruleResult.severity,
+          rule_triggered: ruleResult.rule_name,
+          status: 'open',
+          transaction_id: txn.transaction_id,
+          amount: txn.amount,
+          country: txn.country,
+          created_at: new Date().toISOString()
+        });
+      }
     }
-  }
-  
-  if (alertsToInsert.length > 0) {
-    // Batch insert in chunks of 100
-    for (let i = 0; i < alertsToInsert.length; i += 100) {
-      const chunk = alertsToInsert.slice(i, i + 100);
-      await supabase.from('alerts').insert(chunk);
+
+    if (alertsToInsert.length > 0) {
+      await apiPost('/api/alerts', alertsToInsert);
     }
+
+    return alertsToInsert.length;
+  } catch {
+    return 0;
   }
-  
-  return alertsToInsert.length;
 }

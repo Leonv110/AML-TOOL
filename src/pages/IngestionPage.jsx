@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+import { apiPost, apiDelete } from '../apiClient';
 import { useAuth } from '../contexts/AuthContext';
 import { generateAlertsFromTransactions } from '../services/dataService';
 import * as XLSX from 'xlsx';
@@ -121,7 +121,7 @@ export default function IngestionPage() {
                 throw new Error('Excel file is empty');
             }
 
-            // 2. Prepare Data for Supabase (user.id for Supabase Auth)
+            // 2. Prepare Data for PostgreSQL
             const formattedData = parsedData.map(row => ({
                 transaction_id:               row['transaction_id']?.toString(),
                 customer_id:                  row['customer_id']?.toString(),
@@ -153,12 +153,7 @@ export default function IngestionPage() {
 
             // 3. Handle 'Replace' Mode
             if (mode === 'replace') {
-                const { error: deleteError } = await supabase
-                    .from('transactions')
-                    .delete()
-                    .neq('transaction_id', ''); // Delete all rows
-
-                if (deleteError) throw deleteError;
+                await apiDelete('/api/transactions');
             }
 
             setProgress(70);
@@ -167,11 +162,7 @@ export default function IngestionPage() {
             const batchSize = 1000;
             for (let i = 0; i < formattedData.length; i += batchSize) {
                 const batch = formattedData.slice(i, i + batchSize);
-                const { error: insertError } = await supabase
-                    .from('transactions')
-                    .insert(batch);
-
-                if (insertError) throw insertError;
+                await apiPost('/api/transactions', batch);
 
                 // Update progress proportionally
                 const batchProgress = 70 + Math.round((i / formattedData.length) * 30);

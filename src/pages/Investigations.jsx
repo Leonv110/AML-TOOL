@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../supabaseClient';
+import { apiGet } from '../apiClient';
 import { fetchInvestigations } from '../services/dataService';
 import './pages.css';
 
@@ -19,16 +19,16 @@ export default function Investigations() {
   async function loadInvestigations() {
     setLoading(true);
     try {
-      const { data: authData } = await supabase.auth.getUser();
+      const authData = await apiGet('/api/auth/me');
       const currentUser = authData?.user;
       
-      const [allCasesRes, myCasesRes] = await Promise.all([
-        supabase.from('investigations').select('*').order('created_at', { ascending: false }).limit(50),
-        supabase.from('investigations').select('*').eq('assigned_to', currentUser?.id).order('created_at', { ascending: false }).limit(50)
+      const [allCases, myCases] = await Promise.all([
+        apiGet('/api/investigations'),
+        currentUser?.id ? apiGet(`/api/investigations?assigned_to=${currentUser.id}`) : Promise.resolve([])
       ]);
       
-      setInvestigations(allCasesRes.data || []);
-      setMyInvestigations(myCasesRes.data || []);
+      setInvestigations(allCases || []);
+      setMyInvestigations(myCases || []);
     } catch (err) {
       // Handle silently
     } finally {

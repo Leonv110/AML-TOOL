@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+import { apiGet } from '../apiClient';
 import { fetchAllTransactions, fetchRules, toggleRuleStatus, fetchAlertCountForRule } from '../services/dataService';
 import './pages.css';
 
@@ -26,7 +26,7 @@ export default function TransactionMonitoring() {
       setTransactions(txns);
 
       // Enrich rules with live alert counts
-      const { data: alertData } = await supabase.from('alerts').select('rule_triggered');
+      const alertData = await apiGet('/api/alerts/rule-summary');
       let counts = {};
       if (alertData) {
         counts = alertData.reduce((acc, alert) => {

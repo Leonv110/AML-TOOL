@@ -1,87 +1,58 @@
 import os
-from supabase import create_client, Client
+import psycopg2
 from dotenv import load_dotenv
-import uuid
 from datetime import datetime, timedelta
 
 load_dotenv()
 
-SUPABASE_URL = os.getenv("VITE_SUPABASE_URL")
-SUPABASE_KEY = os.getenv("VITE_SUPABASE_ANON_KEY")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+conn = psycopg2.connect(DATABASE_URL, sslmode='require')
 
 def seed_data():
     print("Seeding test transactions...")
-    
-    # Use existing customer IDs from the migration script if possible
-    # CUST001, CUST002, CUST003, CUST004, CUST005
-    
+
     transactions = [
         # 1. Geo-Risk (CUST001)
-        {
-            "transaction_id": "TXN_GEO_001",
-            "customer_id": "CUST001",
-            "amount": 5000,
-            "transaction_date": datetime.now().isoformat(),
-            "country": "Nigeria",
-            "country_risk_level": "High"
-        },
-        # 2. Dormancy (CUST002) - we'll insert a previous txn far in the past
-        {
-            "transaction_id": "TXN_DORM_PREV",
-            "customer_id": "CUST002",
-            "amount": 100,
-            "transaction_date": (datetime.now() - timedelta(days=60)).isoformat()
-        },
-        {
-            "transaction_id": "TXN_DORM_NEW",
-            "customer_id": "CUST002",
-            "amount": 1200,
-            "transaction_date": datetime.now().isoformat()
-        },
-        # 3. Structuring (CUST003) - 3 txns within 7 days, sum 60k, individual 20k
-        {
-            "transaction_id": "TXN_STR_001",
-            "customer_id": "CUST003",
-            "amount": 20000,
-            "transaction_date": (datetime.now() - timedelta(days=2)).isoformat()
-        },
-        {
-            "transaction_id": "TXN_STR_002",
-            "customer_id": "CUST003",
-            "amount": 20000,
-            "transaction_date": (datetime.now() - timedelta(days=1)).isoformat()
-        },
-        {
-            "transaction_id": "TXN_STR_003",
-            "customer_id": "CUST003",
-            "amount": 20000,
-            "transaction_date": datetime.now().isoformat()
-        },
-        # 4. Velocity Spike (CUST004) - 5 txns in the same hour
-        {
-            "transaction_id": "TXN_VEL_001", "customer_id": "CUST004", "amount": 1000, "transaction_date": datetime.now().isoformat()
-        },
-        {
-            "transaction_id": "TXN_VEL_002", "customer_id": "CUST004", "amount": 1000, "transaction_date": (datetime.now() - timedelta(minutes=10)).isoformat()
-        },
-        {
-            "transaction_id": "TXN_VEL_003", "customer_id": "CUST004", "amount": 1000, "transaction_date": (datetime.now() - timedelta(minutes=20)).isoformat()
-        },
-        {
-            "transaction_id": "TXN_VEL_004", "customer_id": "CUST004", "amount": 1000, "transaction_date": (datetime.now() - timedelta(minutes=30)).isoformat()
-        },
-        {
-            "transaction_id": "TXN_VEL_005", "customer_id": "CUST004", "amount": 50000, "transaction_date": (datetime.now() - timedelta(minutes=40)).isoformat()
-        }
+        ("TXN_GEO_001", "CUST001", 5000, datetime.now().isoformat(), None, "Nigeria", "High"),
+        # 2. Dormancy (CUST002)
+        ("TXN_DORM_PREV", "CUST002", 100, (datetime.now() - timedelta(days=60)).isoformat(), None, None, None),
+        ("TXN_DORM_NEW", "CUST002", 1200, datetime.now().isoformat(), None, None, None),
+        # 3. Structuring (CUST003)
+        ("TXN_STR_001", "CUST003", 20000, (datetime.now() - timedelta(days=2)).isoformat(), None, None, None),
+        ("TXN_STR_002", "CUST003", 20000, (datetime.now() - timedelta(days=1)).isoformat(), None, None, None),
+        ("TXN_STR_003", "CUST003", 20000, datetime.now().isoformat(), None, None, None),
+        # 4. Velocity Spike (CUST004)
+        ("TXN_VEL_001", "CUST004", 1000, datetime.now().isoformat(), None, None, None),
+        ("TXN_VEL_002", "CUST004", 1000, (datetime.now() - timedelta(minutes=10)).isoformat(), None, None, None),
+        ("TXN_VEL_003", "CUST004", 1000, (datetime.now() - timedelta(minutes=20)).isoformat(), None, None, None),
+        ("TXN_VEL_004", "CUST004", 1000, (datetime.now() - timedelta(minutes=30)).isoformat(), None, None, None),
+        ("TXN_VEL_005", "CUST004", 50000, (datetime.now() - timedelta(minutes=40)).isoformat(), None, None, None),
     ]
-    
+
+    cur = conn.cursor()
     try:
-        response = supabase.table("transactions").upsert(transactions).execute()
+        for txn in transactions:
+            cur.execute(
+                """INSERT INTO transactions (transaction_id, customer_id, amount, transaction_date, transaction_type, country, country_risk_level)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s)
+                   ON CONFLICT (transaction_id) DO UPDATE SET
+                     customer_id = EXCLUDED.customer_id,
+                     amount = EXCLUDED.amount,
+                     transaction_date = EXCLUDED.transaction_date,
+                     transaction_type = EXCLUDED.transaction_type,
+                     country = EXCLUDED.country,
+                     country_risk_level = EXCLUDED.country_risk_level""",
+                txn
+            )
+        conn.commit()
         print(f"Upserted {len(transactions)} transactions.")
     except Exception as e:
+        conn.rollback()
         print(f"Error seeding: {e}")
+    finally:
+        cur.close()
 
 if __name__ == "__main__":
     seed_data()
+    conn.close()

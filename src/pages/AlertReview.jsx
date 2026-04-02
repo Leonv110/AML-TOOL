@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+import { apiGet, apiPost } from '../apiClient';
 import { fetchAlerts, updateAlertStatus, fetchCustomerById, fetchTransactionsForCustomer } from '../services/dataService';
 import { buildPayload, callGemini } from '../services/aiService';
 import './pages.css';
@@ -32,20 +32,16 @@ export default function AlertReview() {
   async function handleStatusChange(alert, newStatus) {
     try {
       if (newStatus === 'escalated') {
-        const { data: user } = await supabase.auth.getUser();
-        const { data: investigation } = await supabase
-          .from('investigations')
-          .insert({
+        const authData = await apiGet('/api/auth/me');
+        const investigation = await apiPost('/api/investigations', {
             case_id: `CASE-${Date.now()}`,
             customer_id: alert.customer_id,
             customer_name: alert.customer_name || alert.customer_id,
             risk_level: alert.risk_level,
             alert_type: alert.rule_triggered,
             status: 'escalated',
-            assigned_to: user?.user?.id
-          })
-          .select()
-          .single();
+            assigned_to: authData?.user?.id
+          });
 
         await updateAlertStatus(alert.alert_id, 'escalated', investigation?.case_id);
       } else {

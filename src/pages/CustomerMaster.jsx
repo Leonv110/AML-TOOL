@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import { supabase } from '../supabaseClient';
 import { upsertCustomers, fetchAllCustomers } from '../services/dataService';
 import * as XLSX from 'xlsx';
 import './pages.css';

@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { supabase, isConfigured } from '../supabaseClient';
+import { authLogin, authSignup, authGetMe, authLogout, isAuthenticated, getToken } from '../apiClient';
 
 const AuthContext = createContext(null);
 
@@ -68,76 +68,38 @@ export function AuthProvider({ children }) {
         };
     }, [user, resetSessionTimer, startSessionTimer, clearTimers]);
 
-    // --- Supabase auth listener ---
+    // --- Check for existing session on mount ---
     useEffect(() => {
-        if (!isConfigured || !supabase) {
-            setLoading(false);
-            return;
-        }
+        async function checkSession() {
+            if (!isAuthenticated()) {
+                setLoading(false);
+                return;
+            }
 
-        // Get initial session
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            const u = session?.user ?? null;
-            setUser(u);
-            if (u) {
-                // fetch profile role
-                supabase.from('profiles').select('role').eq('id', u.id).maybeSingle().then(({ data }) => {
-                    setUserRole(data?.role ?? null);
-                }).catch(() => setUserRole(null));
-            } else {
+            try {
+                const data = await authGetMe();
+                setUser(data.user);
+                setUserRole(data.role);
+            } catch (err) {
+                // Token is invalid or expired
+                authLogout();
+                setUser(null);
                 setUserRole(null);
             }
             setLoading(false);
-        });
+        }
 
-        // Listen for auth changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            (_event, session) => {
-                const u = session?.user ?? null;
-                setUser(u);
-                if (u) {
-                    supabase.from('profiles').select('role').eq('id', u.id).maybeSingle().then(({ data }) => {
-                        setUserRole(data?.role ?? null);
-                    }).catch(() => setUserRole(null));
-                } else {
-                    setUserRole(null);
-                }
-                setLoading(false);
-            }
-        );
-
-        return () => subscription.unsubscribe();
+        checkSession();
     }, []);
 
     // --- Auth methods ---
     const login = async (email, password, rememberMe = false) => {
-        if (!isConfigured || !supabase) {
-            const msg = 'Supabase is not configured. Please add your Supabase credentials to the .env file.';
-            setError(msg);
-            throw new Error(msg);
-        }
-
         setError(null);
         try {
-            const { data, error: authError } = await supabase.auth.signInWithPassword({
-                email,
-                password,
-            });
-
-            if (authError) throw authError;
-            // fetch role from profiles table
-            let fetchedRole = null;
-            try {
-                const uid = data?.user?.id;
-                if (uid) {
-                    const { data: profileData } = await supabase.from('profiles').select('role').eq('id', uid).maybeSingle();
-                    fetchedRole = profileData?.role ?? null;
-                    setUserRole(fetchedRole);
-                }
-            } catch (e) {
-                setUserRole(null);
-            }
-            return { user: data.user, role: fetchedRole };
+            const data = await authLogin(email, password);
+            setUser(data.user);
+            setUserRole(data.role);
+            return { user: data.user, role: data.role };
         } catch (err) {
             const message = getErrorMessage(err.message);
             setError(message);
@@ -146,32 +108,11 @@ export function AuthProvider({ children }) {
     };
 
     const signup = async (email, password, role = 'student') => {
-        if (!isConfigured || !supabase) {
-            const msg = 'Supabase is not configured. Please add your Supabase credentials to the .env file.';
-            setError(msg);
-            throw new Error(msg);
-        }
-
         setError(null);
         try {
-            const { data, error: authError } = await supabase.auth.signUp({
-                email,
-                password,
-                options: { data: { role } },
-            });
-
-            if (authError) throw authError;
-
-            // If a user object was returned immediately (no email confirmation required), upsert a profile row
-            const uid = data?.user?.id;
-            if (uid) {
-                try {
-                    await supabase.from('profiles').upsert({ id: uid, email, role });
-                    setUserRole(role);
-                } catch (e) {
-                    // ignore profile insert errors; backend trigger or later sync can set role
-                }
-            }
+            const data = await authSignup(email, password, role);
+            setUser(data.user);
+            setUserRole(data.role);
             return data.user;
         } catch (err) {
             const message = getErrorMessage(err.message);
@@ -182,12 +123,9 @@ export function AuthProvider({ children }) {
 
     const logout = async () => {
         clearTimers();
-        if (!supabase) return;
-        try {
-            await supabase.auth.signOut();
-        } catch (err) {
-            console.error('Logout error:', err);
-        }
+        authLogout();
+        setUser(null);
+        setUserRole(null);
     };
 
     const clearError = () => setError(null);
@@ -199,7 +137,7 @@ export function AuthProvider({ children }) {
         error,
         sessionWarning,
         sessionTimeLeft,
-        isConfigured,
+        isConfigured: true, // Always configured (no Supabase check needed)
         login,
         signup,
         logout,

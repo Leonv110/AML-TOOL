@@ -1,5 +1,5 @@
 pandas
 scikit-learn
 networkx
-supabase
+psycopg2-binary
 python-dotenv

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+import { apiGet } from '../apiClient';
 import './pages.css';
 
 export default function DashboardPage() {
@@ -17,26 +17,20 @@ export default function DashboardPage() {
   async function loadDashboard() {
     setLoading(true);
     try {
-      const [customersRes, highRiskRes, openAlertsRes, openSARRes] = await Promise.all([
-        supabase.from('customers').select('*', { count: 'exact', head: true }),
-        supabase.from('customers').select('*', { count: 'exact', head: true }).eq('risk_tier', 'HIGH'),
-        supabase.from('alerts').select('*', { count: 'exact', head: true }).eq('status', 'open'),
-        supabase.from('investigations').select('*', { count: 'exact', head: true }).eq('status', 'draft_sar')
-      ]);
+      const counts = await apiGet('/api/dashboard/counts');
       
       setStats({
-        total: customersRes.count || 0,
-        highRisk: highRiskRes.count || 0,
-        openAlerts: openAlertsRes.count || 0,
-        openSAR: openSARRes.count || 0
+        total: counts.totalCustomers || 0,
+        highRisk: counts.highRisk || 0,
+        openAlerts: counts.openAlerts || 0,
+        openSAR: counts.openSAR || 0
       });
 
       // Fetch Student Performance
-      if (supabase) {
-        const [{ data: studentAlerts }, { data: studentInvs }] = await Promise.all([
-          supabase.from('alerts').select('assigned_to, status, created_at, updated_at').neq('status', 'open'),
-          supabase.from('investigations').select('assigned_to, status')
-        ]);
+      {
+        const analystStats = await apiGet('/api/dashboard/analyst-stats');
+        const studentAlerts = analystStats.alerts || [];
+        const studentInvs = analystStats.investigations || [];
         
         const perfMap = {};
         (studentAlerts || []).forEach(a => {
