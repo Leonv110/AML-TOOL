@@ -5,6 +5,9 @@ import {
   fetchInvestigationByCaseId, fetchCustomerById, fetchTransactionsForCustomer,
   computeRiskScore, updateInvestigation
 } from '../services/dataService';
+import { logEvent } from '../services/auditService';
+import { generateSTR } from '../services/reportGenerator';
+import { apiPost } from '../apiClient';
 import { screenCustomer } from '../services/screeningService';
 import './pages.css';
 
@@ -68,6 +71,7 @@ export default function InvestigationWorkspace() {
       };
       await updateInvestigation(investigation.id, updates);
       setInvestigation(prev => ({ ...prev, ...updates }));
+      logEvent(`SAR_${status.toUpperCase()}`, 'investigation', investigation.case_id, { customer_id: investigation.customer_id, decision: status });
 
       if (status === 'draft_sar') {
         setShowSarForm(true);
@@ -360,6 +364,40 @@ export default function InvestigationWorkspace() {
                   onChange={e => setSarData(p => ({ ...p, recommendation: e.target.value }))}
                   placeholder="Your recommendation..." aria-label="SAR recommendation" />
               </div>
+            </div>
+            {/* Generate STR PDF Button */}
+            <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(167, 139, 250, 0.15)' }}>
+              <button
+                className="btn btn-primary"
+                onClick={async () => {
+                  try {
+                    const result = generateSTR(investigation, customer, transactions, sarData);
+                    // Save report metadata
+                    await apiPost('/api/reports', {
+                      report_type: 'STR',
+                      parameters: { case_id: investigation.case_id, customer_id: customer?.customer_id },
+                      row_count: transactions?.filter(t => t.flagged)?.length || transactions?.length || 0,
+                      title: `STR — Case ${investigation.case_id} — ${customer?.name || 'Unknown'}`,
+                      case_id: investigation.case_id,
+                      customer_id: customer?.customer_id,
+                    });
+                    logEvent('REPORT_GENERATED', 'reports', result.refNumber, {
+                      type: 'STR', case_id: investigation.case_id, customer_id: customer?.customer_id,
+                      row_count: result.rowCount,
+                    });
+                  } catch {}
+                }}
+                style={{ width: '100%' }}
+                aria-label="Generate STR PDF"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="12" y1="18" x2="12" y2="12" />
+                  <polyline points="9 15 12 18 15 15" />
+                </svg>
+                Generate STR PDF for FIU-IND Submission
+              </button>
             </div>
           </div>
         )}

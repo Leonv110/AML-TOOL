@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { path: '/investigations', label: 'Investigations' },
   { path: '/reports', label: 'Reports' },
   { path: '/ingestion', label: 'Data Ingestion' },
+  { path: '/audit-log', label: 'Audit Log' },
 ];
 
 export default function DashboardShell() {

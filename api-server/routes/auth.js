@@ -10,19 +10,23 @@ const TOKEN_EXPIRY = '24h';
 
 // POST /api/auth/signup
 router.post('/signup', async (req, res) => {
+  const client = await pool.connect();
   try {
     const { email, password, role = 'student' } = req.body;
 
     if (!email || !password) {
+      client.release();
       return res.status(400).json({ error: 'Email and password are required' });
     }
     if (password.length < 6) {
+      client.release();
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
 
     // Check if user already exists
-    const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    const existing = await client.query('SELECT id FROM users WHERE email = $1', [email]);
     if (existing.rows.length > 0) {
+      client.release();
       return res.status(409).json({ error: 'User already registered' });
     }
 
@@ -31,17 +35,18 @@ router.post('/signup', async (req, res) => {
     const password_hash = await bcrypt.hash(password, salt);
 
     // Insert user
-    const userResult = await pool.query(
+    const userResult = await client.query(
       'INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id, email, created_at',
       [email, password_hash]
     );
     const user = userResult.rows[0];
 
     // Insert profile
-    await pool.query(
+    await client.query(
       'INSERT INTO profiles (id, email, role) VALUES ($1, $2, $3)',
       [user.id, email, role]
     );
+    client.release();
 
     // Generate token
     const token = jwt.sign(
@@ -56,6 +61,8 @@ router.post('/signup', async (req, res) => {
       token,
     });
   } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    client.release();
     console.error('Signup error:', err);
     res.status(500).json({ error: 'Registration failed. Please try again.' });
   }

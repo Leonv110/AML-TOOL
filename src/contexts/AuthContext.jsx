@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { authLogin, authSignup, authGetMe, authLogout, isAuthenticated, getToken } from '../apiClient';
+import { logEvent } from '../services/auditService';
 
 const AuthContext = createContext(null);
 
@@ -99,6 +100,7 @@ export function AuthProvider({ children }) {
             const data = await authLogin(email, password);
             setUser(data.user);
             setUserRole(data.role);
+            logEvent('AUTH_LOGIN', 'user', data.user?.id || data.user?.email, { email: data.user?.email, role: data.role });
             return { user: data.user, role: data.role };
         } catch (err) {
             const message = getErrorMessage(err.message);
@@ -122,6 +124,7 @@ export function AuthProvider({ children }) {
     };
 
     const logout = async () => {
+        logEvent('AUTH_LOGOUT', 'user', user?.id || user?.email, { email: user?.email });
         clearTimers();
         authLogout();
         setUser(null);

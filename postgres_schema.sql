@@ -187,6 +187,60 @@ INSERT INTO customers (customer_id, account_number, name, normalized_name, date_
 ON CONFLICT DO NOTHING;
 
 -- ============================================================
+-- 8b. AUDIT LOGS TABLE (immutable, append-only)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  event_type TEXT NOT NULL,
+  actor_id UUID,
+  actor_role TEXT NOT NULL DEFAULT 'unknown',
+  entity_type TEXT,
+  entity_id TEXT,
+  metadata JSONB,
+  timestamp TIMESTAMPTZ DEFAULT now() NOT NULL,
+  hmac_signature TEXT NOT NULL
+);
+
+-- Index for common queries
+CREATE INDEX IF NOT EXISTS idx_audit_logs_event_type ON audit_logs(event_type);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp DESC);
+
+-- ============================================================
+-- 9. REPORTS TABLE (report history metadata)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS reports (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  report_type TEXT NOT NULL,
+  generated_by UUID,
+  generated_at TIMESTAMPTZ DEFAULT now(),
+  parameters JSONB,
+  row_count INTEGER DEFAULT 0,
+  title TEXT,
+  status TEXT DEFAULT 'generated',
+  case_id TEXT,
+  customer_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_reports_type ON reports(report_type);
+CREATE INDEX IF NOT EXISTS idx_reports_generated_at ON reports(generated_at DESC);
+
+-- ============================================================
+-- 10. REPORT SCHEDULES TABLE (automated report generation)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS report_schedules (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  report_type TEXT NOT NULL,
+  frequency TEXT NOT NULL DEFAULT 'weekly',
+  parameters JSONB,
+  recipient_email TEXT,
+  is_active BOOLEAN DEFAULT true,
+  created_by UUID,
+  last_run_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- ============================================================
 -- DONE — All tables and seed data created
 -- No RLS policies (handled by Express.js API auth layer)
 -- ============================================================

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { apiPost, apiDelete } from '../apiClient';
 import { useAuth } from '../contexts/AuthContext';
 import { generateAlertsFromTransactions } from '../services/dataService';
+import { logEvent } from '../services/auditService';
 import * as XLSX from 'xlsx';
 import './IngestionPage.css';
 
@@ -171,6 +172,7 @@ export default function IngestionPage() {
 
             setProgress(100);
             setStatus({ type: 'success', message: `Successfully ingested ${formattedData.length} records.` });
+            logEvent('DATA_UPLOAD_TRANSACTION', 'transactions', null, { count: formattedData.length, filename: file?.name });
             setUploadComplete(true);
             setUploadedBatchId(null);
             setFile(null);

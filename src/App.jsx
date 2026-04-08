@@ -14,6 +14,7 @@ import AlertReview from './pages/AlertReview';
 import Investigations from './pages/Investigations';
 import InvestigationWorkspace from './pages/InvestigationWorkspace';
 import Reports from './pages/Reports';
+import AuditLog from './pages/AuditLog';
 import IngestionPage from './pages/IngestionPage';
 
 function App() {
@@ -40,6 +41,7 @@ function App() {
                         <Route path="/investigations/:case_id" element={<InvestigationWorkspace />} />
                         <Route path="/reports" element={<Reports />} />
                         <Route path="/ingestion" element={<IngestionPage />} />
+                        <Route path="/audit-log" element={<AuditLog />} />
                     </Route>
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>

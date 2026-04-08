@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiGet } from '../apiClient';
 import { fetchAllTransactions, fetchRules, toggleRuleStatus, fetchAlertCountForRule } from '../services/dataService';
+import { logEvent } from '../services/auditService';
 import './pages.css';
 
 export default function TransactionMonitoring() {
@@ -69,6 +70,7 @@ export default function TransactionMonitoring() {
     try {
       await toggleRuleStatus(rule.id, newStatus);
       setRules(prev => prev.map(r => r.id === rule.id ? { ...r, status: newStatus } : r));
+      logEvent('RULE_STATUS_CHANGED', 'rule', rule.id, { rule_name: rule.name, new_status: newStatus });
     } catch (err) {
       // Handle silently
     }

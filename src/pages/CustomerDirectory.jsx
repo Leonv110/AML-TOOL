@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fetchAllCustomers, fetchTransactionsForCustomer, computeRiskScore } from '../services/dataService';
+import { fetchAllCustomers } from '../services/dataService';
 import './pages.css';
 
 export default function CustomerDirectory() {
@@ -16,16 +16,14 @@ export default function CustomerDirectory() {
   async function loadCustomers() {
     setLoading(true);
     try {
+      // Single query — no N+1. Uses risk_tier from customers table.
       const allCustomers = await fetchAllCustomers();
-      const enriched = await Promise.all(
-        allCustomers.map(async (cust) => {
-          const txns = await fetchTransactionsForCustomer(cust.customer_id);
-          const risk = computeRiskScore(cust, txns);
-          return { ...cust, risk };
-        })
-      );
-      enriched.sort((a, b) => b.risk.score - a.risk.score);
-      setCustomers(enriched);
+      // Sort high risk first using stored risk_tier
+      const sorted = (allCustomers || []).sort((a, b) => {
+        const tierOrder = { HIGH: 3, MEDIUM: 2, LOW: 1 };
+        return (tierOrder[b.risk_tier] || 0) - (tierOrder[a.risk_tier] || 0);
+      });
+      setCustomers(sorted);
     } catch (err) {
       // Handle silently
     } finally {
@@ -72,9 +70,25 @@ export default function CustomerDirectory() {
 
       <div className="card">
         {loading ? (
-          <div className="loading-state">
-            <div className="loading-spinner-sm" />
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.8125rem' }}>Loading customers...</p>
+          <div className="skeleton-table">
+            <div className="skeleton-row header">
+              <div className="skeleton-cell" style={{ width: '25%' }} />
+              <div className="skeleton-cell" style={{ width: '15%' }} />
+              <div className="skeleton-cell" style={{ width: '20%' }} />
+              <div className="skeleton-cell" style={{ width: '15%' }} />
+              <div className="skeleton-cell" style={{ width: '10%' }} />
+              <div className="skeleton-cell" style={{ width: '15%' }} />
+            </div>
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div className="skeleton-row" key={i}>
+                <div className="skeleton-cell" style={{ width: '25%' }} />
+                <div className="skeleton-cell" style={{ width: '15%' }} />
+                <div className="skeleton-cell" style={{ width: '20%' }} />
+                <div className="skeleton-cell" style={{ width: '15%' }} />
+                <div className="skeleton-cell" style={{ width: '10%' }} />
+                <div className="skeleton-cell" style={{ width: '15%' }} />
+              </div>
+            ))}
           </div>
         ) : filtered.length === 0 ? (
           <div className="empty-state">
@@ -113,8 +127,8 @@ export default function CustomerDirectory() {
                   </td>
                   <td>
                     <div className="risk-bar-container">
-                      <span className={`risk-badge ${c.risk.tier.toLowerCase()}`}>
-                        {c.risk.score} — {c.risk.tier}
+                      <span className={`risk-badge ${(c.risk_tier || 'low').toLowerCase()}`}>
+                        {c.risk_tier || 'LOW'}
                       </span>
                     </div>
                   </td>

@@ -180,6 +180,77 @@ class AMLProcessor:
             except Exception as e:
                 print(f"Error executing Layering detection: {e}")
 
+        # 6. Rapid Fund Movement: Flag if > 80% of balance moved out quickly after deposit
+        if all(col in df.columns for col in ['amount', 'balance_before', 'balance_after']):
+            p(83, "Applying Rapid Fund Movement rule...")
+            for idx, row in df.iterrows():
+                try:
+                    bal_before = float(row.get('balance_before', 0) or 0)
+                    bal_after = float(row.get('balance_after', 0) or 0)
+                    amt = float(row.get('amount', 0) or 0)
+                    if bal_before > 0 and amt > 0:
+                        pct_moved = (bal_before - bal_after) / bal_before
+                        if pct_moved >= 0.80:
+                            df.at[idx, 'flagged'] = True
+                            df.at[idx, 'flag_reason'] = append_reason(df.at[idx, 'flag_reason'], 'Rapid Fund Movement')
+                            if not df.at[idx, 'rule_triggered']:
+                                df.at[idx, 'rule_triggered'] = 'Rapid Fund Movement'
+                except (ValueError, TypeError):
+                    pass
+
+        # 7. New Device High Value: Flag high value txn from unrecognised device
+        if 'is_new_device' in df.columns and 'amount' in df.columns:
+            p(86, "Applying New Device High Value rule...")
+            avg_amount = pd.to_numeric(df['amount'], errors='coerce').mean()
+            threshold = avg_amount * 2 if avg_amount > 0 else 50000
+            for idx, row in df.iterrows():
+                try:
+                    if row.get('is_new_device') in [True, 'true', 'True', 1, '1']:
+                        amt = float(row.get('amount', 0) or 0)
+                        if amt >= threshold:
+                            df.at[idx, 'flagged'] = True
+                            df.at[idx, 'flag_reason'] = append_reason(df.at[idx, 'flag_reason'], 'New Device High Value')
+                            if not df.at[idx, 'rule_triggered']:
+                                df.at[idx, 'rule_triggered'] = 'New Device High Value'
+                except (ValueError, TypeError):
+                    pass
+
+        # 8. Round Tripping: Same amount +/-5% sent and received from same counterparty within 48hrs
+        u_col = 'customer_id' if 'customer_id' in df.columns else 'user_id'
+        v_col = 'destination_id' if 'destination_id' in df.columns else None
+        t_col = 'transaction_date' if 'transaction_date' in df.columns else 'timestamp'
+
+        if v_col and all(c in df.columns for c in [u_col, v_col, 'amount', t_col]):
+            p(88, "Applying Round Tripping rule...")
+            df['RT_Date'] = pd.to_datetime(df[t_col], errors='coerce')
+            df['RT_Amount'] = pd.to_numeric(df['amount'], errors='coerce').fillna(0)
+            
+            for idx, row in df.iterrows():
+                try:
+                    sender = row[u_col]
+                    receiver = row[v_col]
+                    amt = row['RT_Amount']
+                    dt = row['RT_Date']
+                    if pd.isna(sender) or pd.isna(receiver) or pd.isna(dt) or amt <= 0:
+                        continue
+                    
+                    # Look for a reverse transaction: receiver -> sender, same amount +/-5%, within 48hrs
+                    reverse = df[
+                        (df[u_col] == receiver) &
+                        (df[v_col] == sender) &
+                        (df['RT_Amount'].between(amt * 0.95, amt * 1.05)) &
+                        ((df['RT_Date'] - dt).abs() <= pd.Timedelta(hours=48))
+                    ]
+                    if len(reverse) > 0:
+                        df.at[idx, 'flagged'] = True
+                        df.at[idx, 'flag_reason'] = append_reason(df.at[idx, 'flag_reason'], 'Round Tripping')
+                        if not df.at[idx, 'rule_triggered']:
+                            df.at[idx, 'rule_triggered'] = 'Round Tripping'
+                except Exception:
+                    pass
+            
+            df.drop(columns=['RT_Date', 'RT_Amount'], inplace=True, errors='ignore')
+
         # Finalize Output: Push updates to PostgreSQL using parameterized SQL
         p(90, "Preparing updates for PostgreSQL...")
 

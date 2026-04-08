@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../db');
 const { authenticateToken } = require('../middleware/auth');
+const { amlWatcherRequest } = require('../services/amlWatcherService');
 
 const router = express.Router();
 
@@ -92,6 +93,43 @@ router.patch('/:customerId/pep', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('Update PEP error:', err);
     res.status(500).json({ error: 'Failed to update PEP flag' });
+  }
+});
+
+// POST /api/customers/:customerId/screen — Screen customer against AML Watcher
+router.post('/:customerId/screen', authenticateToken, async (req, res) => {
+  try {
+    // 1. Fetch customer from database
+    const { rows } = await pool.query(
+      'SELECT * FROM customers WHERE customer_id = $1',
+      [req.params.customerId]
+    );
+    const customer = rows[0];
+
+    if (!customer) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+
+    // 2. Prepare payload for AML Watcher (modify payload keys based on exact API docs if needed)
+    const payload = {
+      name: customer.name,
+      country: customer.country || "",
+      // year_of_birth: customer.date_of_birth ... etc
+    };
+
+    // 3. Screen against AML Watcher using our service
+    const amlResult = await amlWatcherRequest('/api/v1/search', payload, 'POST');
+
+    // 4. (Optional) Auto-update PEP flag if AML Watcher flags them as PEP
+    // If the API returns something like `amlResult.risk_level === 'high'`
+    // we could update the DB here.
+
+    // 5. Return the screening result to the frontend
+    res.json({ success: true, screeningResult: amlResult });
+
+  } catch (err) {
+    console.error('AML Screening error:', err);
+    res.status(500).json({ error: 'Failed to screen customer via AML Watcher' });
   }
 });
 

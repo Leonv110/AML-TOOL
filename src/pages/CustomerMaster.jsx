@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { upsertCustomers, fetchAllCustomers } from '../services/dataService';
+import { logEvent } from '../services/auditService';
 import * as XLSX from 'xlsx';
 import './pages.css';
 
@@ -145,6 +146,7 @@ export default function CustomerMaster() {
       });
 
       const count = await upsertCustomers(mapped);
+      logEvent('DATA_UPLOAD_CUSTOMER', 'customers', null, { count, filename: file?.name });
       setStatus({ type: 'success', message: `Successfully uploaded ${count} customer records.` });
       setFile(null);
       await loadCustomers();

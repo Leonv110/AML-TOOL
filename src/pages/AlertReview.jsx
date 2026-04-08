@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiGet, apiPost } from '../apiClient';
 import { fetchAlerts, updateAlertStatus, fetchCustomerById, fetchTransactionsForCustomer } from '../services/dataService';
+import { logEvent } from '../services/auditService';
 import { buildPayload, callGemini } from '../services/aiService';
 import './pages.css';
 
@@ -48,6 +49,7 @@ export default function AlertReview() {
         await updateAlertStatus(alert.alert_id, newStatus);
       }
       setAlerts(prev => prev.map(a => a.alert_id === alert.alert_id ? { ...a, status: newStatus } : a));
+      logEvent(`ALERT_${newStatus.toUpperCase()}`, 'alert', alert.alert_id, { customer_id: alert.customer_id, rule: alert.rule_triggered });
     } catch (err) {
       // Handle silently
     }

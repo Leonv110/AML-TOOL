@@ -112,16 +112,9 @@ export async function fetchDashboardKPIs() {
 
 export async function fetchHighRiskCount() {
   try {
-    const customers = await apiGet('/api/customers');
-    if (!customers || customers.length === 0) return 0;
-
-    let highCount = 0;
-    for (const cust of customers) {
-      const txns = await apiGet(`/api/transactions/customer/${cust.customer_id}`);
-      const result = computeRiskScore(cust, txns || []);
-      if (result.score >= 66) highCount++;
-    }
-    return highCount;
+    // Single server-side COUNT — no N+1
+    const counts = await apiGet('/api/dashboard/counts');
+    return counts?.highRisk || 0;
   } catch {
     return 0;
   }

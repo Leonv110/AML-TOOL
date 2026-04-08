@@ -6,6 +6,7 @@ import {
   fetchDocumentsForCustomer, fetchNotesForCustomer, computeRiskScore,
   uploadDocument, saveNote
 } from '../services/dataService';
+import { logEvent } from '../services/auditService';
 import { screenCustomer } from '../services/screeningService';
 import './pages.css';
 
@@ -58,6 +59,9 @@ export default function CustomerProfile() {
       // Run screening on page load
       const screenResult = await screenCustomer(cust.name, cust.date_of_birth, cust.country);
       setScreening(screenResult);
+
+      logEvent('CUSTOMER_VIEWED', 'customer', id, { name: cust.name, country: cust.country });
+      logEvent('SCREENING_RUN', 'customer', id, { name: cust.name, result: screenResult?.match });
     } catch (err) {
       // Handle silently
     } finally {

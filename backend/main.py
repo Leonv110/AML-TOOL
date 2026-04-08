@@ -86,3 +86,82 @@ async def get_processing_status():
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+# ============================================================
+# ML Model Endpoints
+# ============================================================
+
+@app.post("/api/ml/train")
+async def train_ml_model():
+    """Train the Isolation Forest ensemble on all transactions."""
+    try:
+        import pandas as pd
+        from ml.ensemble import AMLEnsemble
+
+        conn = get_db_conn()
+        cur = conn.cursor(psycopg2.extras.RealDictCursor)
+        cur.execute("SELECT * FROM transactions LIMIT 100000")
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+
+        if not rows:
+            raise HTTPException(status_code=400, detail="No transactions found for training")
+
+        df = pd.DataFrame(rows)
+        model = AMLEnsemble()
+        metrics = model.train(df)
+
+        return {
+            "success": True,
+            "metrics": metrics,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/ml/score/{customer_id}")
+async def score_customer(customer_id: str):
+    """Score all transactions for a given customer using the trained ensemble model."""
+    try:
+        import pandas as pd
+        from ml.ensemble import AMLEnsemble
+
+        conn = get_db_conn()
+        cur = conn.cursor(psycopg2.extras.RealDictCursor)
+        cur.execute("SELECT * FROM transactions WHERE customer_id = %s ORDER BY transaction_date DESC LIMIT 500", (customer_id,))
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+
+        if not rows:
+            raise HTTPException(status_code=404, detail=f"No transactions found for customer {customer_id}")
+
+        df = pd.DataFrame(rows)
+        model = AMLEnsemble()
+
+        if not model.load():
+            raise HTTPException(status_code=400, detail="Model not trained yet. Call POST /api/ml/train first.")
+
+        predictions = model.predict(df)
+
+        # Aggregate into customer-level risk
+        high_count = sum(1 for p in predictions if p['risk_level'] == 'HIGH')
+        medium_count = sum(1 for p in predictions if p['risk_level'] == 'MEDIUM')
+        avg_score = sum(p['anomaly_score'] for p in predictions) / len(predictions)
+
+        return {
+            "customer_id": customer_id,
+            "transactions_scored": len(predictions),
+            "high_risk_transactions": high_count,
+            "medium_risk_transactions": medium_count,
+            "average_anomaly_score": round(avg_score, 4),
+            "transaction_scores": predictions[:20],  # Return top 20 for display
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+

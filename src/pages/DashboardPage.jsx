@@ -17,7 +17,10 @@ export default function DashboardPage() {
   async function loadDashboard() {
     setLoading(true);
     try {
-      const counts = await apiGet('/api/dashboard/counts');
+      const [counts, analystStats] = await Promise.all([
+        apiGet('/api/dashboard/counts'),
+        apiGet('/api/dashboard/analyst-stats'),
+      ]);
       
       setStats({
         total: counts.totalCustomers || 0,
@@ -27,40 +30,37 @@ export default function DashboardPage() {
       });
 
       // Fetch Student Performance
-      {
-        const analystStats = await apiGet('/api/dashboard/analyst-stats');
-        const studentAlerts = analystStats.alerts || [];
-        const studentInvs = analystStats.investigations || [];
-        
-        const perfMap = {};
-        (studentAlerts || []).forEach(a => {
-           if (!a.assigned_to) return;
-           if (!perfMap[a.assigned_to]) perfMap[a.assigned_to] = { alertsReviewed: 0, correctEscalations: 0, totalEscalations: 0, totalTime: 0 };
-           perfMap[a.assigned_to].alertsReviewed++;
-           
-           const created = new Date(a.created_at).getTime();
-           const updated = new Date(a.updated_at || a.created_at).getTime();
-           perfMap[a.assigned_to].totalTime += (updated - created) / 60000; // in mins
-        });
-        
-        (studentInvs || []).forEach(inv => {
-           if (!inv.assigned_to) return;
-           if (!perfMap[inv.assigned_to]) perfMap[inv.assigned_to] = { alertsReviewed: 0, correctEscalations: 0, totalEscalations: 0, totalTime: 0 };
-           perfMap[inv.assigned_to].totalEscalations++;
-           if (inv.status === 'closed_false_positive' || inv.status === 'draft_sar') {
-              perfMap[inv.assigned_to].correctEscalations++;
-           }
-        });
-        
-        const studentData = Object.entries(perfMap).map(([id, data]) => ({
-           name: id.substring(0, 8),
-           alertsReviewed: data.alertsReviewed,
-           accuracy: data.totalEscalations > 0 ? Math.round((data.correctEscalations / data.totalEscalations) * 100) : 0,
-           avgTime: data.alertsReviewed > 0 ? Math.round(data.totalTime / data.alertsReviewed) : 0
-        }));
-        
-        setStudents(studentData);
-      }
+      const studentAlerts = analystStats.alerts || [];
+      const studentInvs = analystStats.investigations || [];
+      
+      const perfMap = {};
+      (studentAlerts || []).forEach(a => {
+         if (!a.assigned_to) return;
+         if (!perfMap[a.assigned_to]) perfMap[a.assigned_to] = { alertsReviewed: 0, correctEscalations: 0, totalEscalations: 0, totalTime: 0 };
+         perfMap[a.assigned_to].alertsReviewed++;
+         
+         const created = new Date(a.created_at).getTime();
+         const updated = new Date(a.updated_at || a.created_at).getTime();
+         perfMap[a.assigned_to].totalTime += (updated - created) / 60000;
+      });
+      
+      (studentInvs || []).forEach(inv => {
+         if (!inv.assigned_to) return;
+         if (!perfMap[inv.assigned_to]) perfMap[inv.assigned_to] = { alertsReviewed: 0, correctEscalations: 0, totalEscalations: 0, totalTime: 0 };
+         perfMap[inv.assigned_to].totalEscalations++;
+         if (inv.status === 'closed_false_positive' || inv.status === 'draft_sar') {
+            perfMap[inv.assigned_to].correctEscalations++;
+         }
+      });
+      
+      const studentData = Object.entries(perfMap).map(([id, data]) => ({
+         name: id.substring(0, 8),
+         alertsReviewed: data.alertsReviewed,
+         accuracy: data.totalEscalations > 0 ? Math.round((data.correctEscalations / data.totalEscalations) * 100) : 0,
+         avgTime: data.alertsReviewed > 0 ? Math.round(data.totalTime / data.alertsReviewed) : 0
+      }));
+      
+      setStudents(studentData);
     } catch (err) {
       // Silently handle errors for dashboard
     } finally {
@@ -79,9 +79,43 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="page-container">
-        <div className="loading-state">
-          <div className="loading-spinner-sm" />
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.8125rem' }}>Loading dashboard...</p>
+        <div className="page-header">
+          <h1>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <rect x="3" y="3" width="7" height="7" rx="1" />
+              <rect x="14" y="3" width="7" height="7" rx="1" />
+              <rect x="3" y="14" width="7" height="7" rx="1" />
+              <rect x="14" y="14" width="7" height="7" rx="1" />
+            </svg>
+            Dashboard
+          </h1>
+          <p>Overview of key metrics, alerts, and compliance status</p>
+        </div>
+        {/* Skeleton KPI cards */}
+        <div className="kpi-grid">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div className="kpi-card skeleton-pulse" key={i}>
+              <div className="skeleton-cell" style={{ width: '60%', height: '0.75rem', marginBottom: '0.5rem' }} />
+              <div className="skeleton-cell" style={{ width: '40%', height: '2rem' }} />
+            </div>
+          ))}
+        </div>
+        {/* Skeleton table */}
+        <div className="card" style={{ marginBottom: '1.5rem' }}>
+          <div className="skeleton-table">
+            <div className="skeleton-row header">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div className="skeleton-cell" key={i} style={{ width: `${15 + i * 3}%` }} />
+              ))}
+            </div>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div className="skeleton-row" key={i}>
+                {Array.from({ length: 6 }).map((_, j) => (
+                  <div className="skeleton-cell" key={j} style={{ width: `${15 + j * 3}%` }} />
+                ))}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
