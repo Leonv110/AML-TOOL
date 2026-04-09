@@ -1,9 +1,6 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Shield, BarChart3, Search, Database, ChevronRight, Lock, Globe, Activity, Mail, Linkedin, Twitter, MapPin, Phone, ChevronDown, ChevronUp } from 'lucide-react';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { Sphere, MeshDistortMaterial, Points, PointMaterial } from '@react-three/drei';
-import * as THREE from 'three';
 import './LandingPage.css';
 
 export default function LandingPage() {
@@ -66,7 +63,7 @@ export default function LandingPage() {
           </div>
           
           <div className="hero-visual">
-            <HolographicGlobe />
+            <NetworkAnimation />
           </div>
         </div>
       </header>
@@ -242,92 +239,50 @@ function FeatureCard({ icon, title, desc }) {
   );
 }
 
-const AnimatedGlobe = () => {
-  const groupRef = useRef();
-  const pointsRef = useRef();
+const NetworkAnimation = () => (
+  <div className="hero-svg-container">
+    <svg viewBox="0 0 800 600" className="network-svg" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="var(--gafa-accent)" stopOpacity="0.4" />
+          <stop offset="100%" stopColor="var(--gafa-accent)" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      
+      {/* Dynamic Network Lines */}
+      <g className="network-lines">
+        <path d="M 200,300 L 400,200 L 600,250 L 500,450 Z" stroke="var(--gafa-accent)" strokeOpacity="0.3" strokeWidth="1" fill="none" />
+        <path d="M 400,200 L 500,100 L 650,150 L 600,250" stroke="var(--gafa-accent)" strokeOpacity="0.2" strokeWidth="1" fill="none" />
+        <path d="M 200,300 L 100,250 L 150,150 L 400,200" stroke="var(--gafa-accent)" strokeOpacity="0.15" strokeWidth="1" fill="none" />
+        <path d="M 500,450 L 600,550 L 750,400 L 600,250" stroke="var(--gafa-accent)" strokeOpacity="0.2" strokeWidth="1" fill="none" />
+        <path d="M 200,300 L 250,500 L 400,550 L 500,450" stroke="var(--gafa-accent)" strokeOpacity="0.15" strokeWidth="1" fill="none" />
+      </g>
 
-  useFrame((state) => {
-    const t = state.clock.getElapsedTime();
-    groupRef.current.rotation.y = t * 0.1;
-    pointsRef.current.rotation.y = -t * 0.05;
-  });
+      {/* Grid pattern / Globe rings represent global data */}
+      <ellipse cx="400" cy="300" rx="300" ry="100" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="1" className="globe-ring-1" />
+      <ellipse cx="400" cy="300" rx="100" ry="300" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="1" className="globe-ring-2" />
+      <circle cx="400" cy="300" r="280" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="1" className="globe-ring-3" />
 
-  const points = useMemo(() => {
-    const p = new Float32Array(2000 * 3);
-    for (let i = 0; i < 2000; i++) {
-      const r = 2.5;
-      const theta = 2 * Math.PI * Math.random();
-      const phi = Math.acos(2 * Math.random() - 1);
-      p[i * 3] = r * Math.sin(phi) * Math.cos(theta);
-      p[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
-      p[i * 3 + 2] = r * Math.cos(phi);
-    }
-    return p;
-  }, []);
-
-  return (
-    <group ref={groupRef}>
-      <Sphere args={[2, 64, 64]}>
-        <MeshDistortMaterial
-          color="#081024"
-          roughness={0.1}
-          metalness={0.8}
-          distort={0.3}
-          speed={2}
-          transparent
-          opacity={0.8}
-        />
-      </Sphere>
-
-      <Sphere args={[2.05, 32, 32]}>
-        <meshStandardMaterial
-          wireframe
-          color="#0eb3a7"
-          transparent
-          opacity={0.15}
-          emissive="#0eb3a7"
-          emissiveIntensity={0.6}
-        />
-      </Sphere>
-
-      {[2.2, 2.6, 3.0].map((radius, i) => (
-        <mesh key={i} rotation={[Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[radius, radius + 0.02, 64]} />
-          <meshBasicMaterial
-            color="#0eb3a7"
-            transparent
-            opacity={0.2 - i * 0.05}
-            side={THREE.DoubleSide}
-          />
-        </mesh>
-      ))}
-
-      <Points ref={pointsRef} positions={points}>
-        <PointMaterial
-          transparent
-          color="#a2db47"
-          size={0.02}
-          sizeAttenuation={true}
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-        />
-      </Points>
-    </group>
-  );
-};
-
-const HolographicGlobe = () => {
-  return (
-    <div style={{ width: '100%', height: '500px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-      <Canvas camera={{ position: [0, 0, 8], fov: 45 }}>
-        <ambientLight intensity={0.5} />
-        <pointLight position={[10, 10, 10]} intensity={1} color="#a2db47" />
-        <pointLight position={[-10, -10, -10]} intensity={0.5} color="#0eb3a7" />
-        <AnimatedGlobe />
-      </Canvas>
-    </div>
-  );
-};
+      {/* Nodes */}
+      <g className="nodes">
+        <circle cx="400" cy="200" r="6" fill="var(--gafa-brand-green)" className="node-pulse" />
+        <circle cx="400" cy="200" r="24" fill="url(#glow)" className="node-glow" />
+        
+        <circle cx="200" cy="300" r="4" fill="var(--gafa-accent)" />
+        <circle cx="600" cy="250" r="5" fill="var(--gafa-accent)" className="node-float-1" />
+        <circle cx="500" cy="450" r="4" fill="var(--gafa-brand-green)" />
+        <circle cx="500" cy="100" r="3" fill="var(--gafa-accent)" className="node-float-2" />
+        <circle cx="650" cy="150" r="4" fill="var(--gafa-accent)" />
+        <circle cx="100" cy="250" r="3" fill="var(--gafa-brand-green)" className="node-float-3" />
+        <circle cx="150" cy="150" r="4" fill="var(--gafa-accent)" />
+        <circle cx="600" cy="550" r="3" fill="var(--gafa-accent)" />
+        <circle cx="750" cy="400" r="4" fill="var(--gafa-brand-green)" className="node-float-1" />
+        <circle cx="250" cy="500" r="3" fill="var(--gafa-accent)" />
+        <circle cx="400" cy="550" r="4" fill="var(--gafa-accent)" />
+      </g>
+    </svg>
+  </div>
+);
 
 function FaqItem({ question, answer }) {
   const [isOpen, setIsOpen] = useState(false);
