@@ -63,7 +63,7 @@ export default function LandingPage() {
           </div>
           
           <div className="hero-visual">
-            <NetworkAnimation />
+            <HolographicGlobe />
           </div>
         </div>
       </header>
