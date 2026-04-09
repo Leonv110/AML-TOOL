@@ -1,6 +1,9 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Shield, BarChart3, Search, Database, ChevronRight, Lock, Globe, Activity, Mail, Linkedin, Twitter, MapPin, Phone, ChevronDown, ChevronUp } from 'lucide-react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { Sphere, MeshDistortMaterial, Points, PointMaterial } from '@react-three/drei';
+import * as THREE from 'three';
 import './LandingPage.css';
 
 export default function LandingPage() {
@@ -239,26 +242,92 @@ function FeatureCard({ icon, title, desc }) {
   );
 }
 
-const HolographicGlobe = () => (
-  <div className="holographic-globe-container">
-    <div className="globe-core">
-      <div className="globe-surface"></div>
-      
-      {/* Orbital Rings */}
-      <div className="orbit orbit-1"></div>
-      <div className="orbit orbit-2"></div>
-      <div className="orbit orbit-3"></div>
-      
-      {/* Orbiting Satellites / Nodes */}
-      <div className="satellite sat-1"></div>
-      <div className="satellite sat-2"></div>
-      <div className="satellite sat-3"></div>
-      <div className="satellite sat-4"></div>
+const AnimatedGlobe = () => {
+  const groupRef = useRef();
+  const pointsRef = useRef();
 
-      <div className="glow-overlay"></div>
+  useFrame((state) => {
+    const t = state.clock.getElapsedTime();
+    groupRef.current.rotation.y = t * 0.1;
+    pointsRef.current.rotation.y = -t * 0.05;
+  });
+
+  const points = useMemo(() => {
+    const p = new Float32Array(2000 * 3);
+    for (let i = 0; i < 2000; i++) {
+      const r = 2.5;
+      const theta = 2 * Math.PI * Math.random();
+      const phi = Math.acos(2 * Math.random() - 1);
+      p[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+      p[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+      p[i * 3 + 2] = r * Math.cos(phi);
+    }
+    return p;
+  }, []);
+
+  return (
+    <group ref={groupRef}>
+      <Sphere args={[2, 64, 64]}>
+        <MeshDistortMaterial
+          color="#081024"
+          roughness={0.1}
+          metalness={0.8}
+          distort={0.3}
+          speed={2}
+          transparent
+          opacity={0.8}
+        />
+      </Sphere>
+
+      <Sphere args={[2.05, 32, 32]}>
+        <meshStandardMaterial
+          wireframe
+          color="#0eb3a7"
+          transparent
+          opacity={0.15}
+          emissive="#0eb3a7"
+          emissiveIntensity={0.6}
+        />
+      </Sphere>
+
+      {[2.2, 2.6, 3.0].map((radius, i) => (
+        <mesh key={i} rotation={[Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[radius, radius + 0.02, 64]} />
+          <meshBasicMaterial
+            color="#0eb3a7"
+            transparent
+            opacity={0.2 - i * 0.05}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+      ))}
+
+      <Points ref={pointsRef} positions={points}>
+        <PointMaterial
+          transparent
+          color="#a2db47"
+          size={0.02}
+          sizeAttenuation={true}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </Points>
+    </group>
+  );
+};
+
+const HolographicGlobe = () => {
+  return (
+    <div style={{ width: '100%', height: '500px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+      <Canvas camera={{ position: [0, 0, 8], fov: 45 }}>
+        <ambientLight intensity={0.5} />
+        <pointLight position={[10, 10, 10]} intensity={1} color="#a2db47" />
+        <pointLight position={[-10, -10, -10]} intensity={0.5} color="#0eb3a7" />
+        <AnimatedGlobe />
+      </Canvas>
     </div>
-  </div>
-);
+  );
+};
 
 function FaqItem({ question, answer }) {
   const [isOpen, setIsOpen] = useState(false);
