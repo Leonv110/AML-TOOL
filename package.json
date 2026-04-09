@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:api": "npm run dev --prefix api-server",
+    "dev:ml": "cd backend && python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload",
+    "dev:all": "concurrently \"npm run dev\" \"npm run dev:api\" \"npm run dev:ml\"",
     "build": "vite build",
     "preview": "vite preview"
   },
@@ -20,6 +23,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.0",
+    "concurrently": "^9.2.1",
     "vite": "^6.0.0",
     "vitest": "^4.1.0"
   }

@@ -22,11 +22,14 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 def get_db_conn():
     """Create a new database connection."""
-    return psycopg2.connect(DATABASE_URL, sslmode='require')
+    # Remove unsupported query parameters like ?pgbouncer=true for psycopg2
+    clean_url = DATABASE_URL.split('?')[0] if DATABASE_URL else DATABASE_URL
+    return psycopg2.connect(clean_url, sslmode='require')
 
 tasks = {}
 
-async def process_task(task_id, batch_id):
+def process_task(task_id, batch_id):
+    conn = None
     try:
         from aml_processor import AMLProcessor
         def update_progress(prog, msg):
@@ -35,16 +38,23 @@ async def process_task(task_id, batch_id):
 
         conn = get_db_conn()
         processor = AMLProcessor(conn)
-        results = await processor.run(batch_id=batch_id, progress_callback=update_progress)
-        conn.close()
+        results = processor.run(batch_id=batch_id, progress_callback=update_progress)
 
         tasks[task_id]["status"] = "completed"
         tasks[task_id]["progress"] = 100
         tasks[task_id]["message"] = "AML processing complete"
         tasks[task_id]["results"] = results
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         tasks[task_id]["status"] = "failed"
         tasks[task_id]["error"] = str(e)
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 @app.post("/api/aml/process")
 async def run_aml_processing(background_tasks: BackgroundTasks, request: dict = {}):

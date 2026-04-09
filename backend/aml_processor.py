@@ -18,7 +18,7 @@ class AMLProcessor:
     def __init__(self, db_conn):
         self.conn = db_conn
 
-    async def run(self, batch_id=None, progress_callback=None):
+    def run(self, batch_id=None, progress_callback=None):
         def p(prog, msg):
             print(msg)
             if progress_callback:
@@ -276,44 +276,54 @@ class AMLProcessor:
                 except Exception as e:
                     pass
 
-            print(f"Updating {len(flagged_df)} flagged transactions individually...")
+            print(f"Batch updating {len(flagged_df)} flagged transactions...")
+            update_data = []
             for _, row in flagged_df.iterrows():
                 if pd.notna(row['transaction_id']):
-                    try:
-                        cur.execute(
-                            "UPDATE transactions SET flagged = TRUE, flag_reason = %s, rule_triggered = %s WHERE transaction_id = %s",
-                            (str(row.get('flag_reason', '')), str(row.get('rule_triggered', '')), row['transaction_id'])
-                        )
-                        success_count += 1
-                        alerts_to_insert.append({
-                            'alert_id': f"ALT-{int(time.time()*1000)}-{str(uuid.uuid4())[:6].upper()}",
-                            'customer_id': row.get(u_col, ''),
-                            'customer_name': row.get('customer_name', row.get(u_col, '')),
-                            'risk_level': 'HIGH',
-                            'rule_triggered': str(row.get('rule_triggered', '')),
-                            'status': 'open',
-                            'transaction_id': row['transaction_id'],
-                            'amount': float(row.get('amount', 0)) if pd.notna(row.get('amount')) else 0,
-                            'country': str(row.get('country', '')),
-                            'created_at': time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime())
-                        })
-                    except Exception as e:
-                        fail_count += 1
+                    update_data.append((
+                        str(row.get('flag_reason', '')),
+                        str(row.get('rule_triggered', '')),
+                        row['transaction_id']
+                    ))
+                    success_count += 1
+                    alerts_to_insert.append((
+                        f"ALT-{int(time.time()*1000)}-{str(uuid.uuid4())[:6].upper()}",
+                        row.get(u_col, ''),
+                        row.get('customer_name', row.get(u_col, '')),
+                        'HIGH',
+                        str(row.get('rule_triggered', '')),
+                        'open',
+                        row['transaction_id'],
+                        float(row.get('amount', 0)) if pd.notna(row.get('amount')) else 0,
+                        str(row.get('country', '')),
+                        time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime())
+                    ))
+
+            try:
+                if update_data:
+                    psycopg2.extras.execute_batch(
+                        cur,
+                        "UPDATE transactions SET flagged = TRUE, flag_reason = %s, rule_triggered = %s WHERE transaction_id = %s",
+                        update_data,
+                        page_size=500
+                    )
+            except Exception as e:
+                print(f"Failed to batch update flagged transactions: {e}")
 
             # Insert alerts
-            alerts_created = len(alerts_to_insert)
-            if alerts_created > 0:
-                for a in alerts_to_insert:
-                    try:
-                        cur.execute(
-                            """INSERT INTO alerts (alert_id, customer_id, customer_name, risk_level, rule_triggered, status, transaction_id, amount, country, created_at)
-                               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                               ON CONFLICT (alert_id) DO NOTHING""",
-                            (a['alert_id'], a['customer_id'], a['customer_name'], a['risk_level'], a['rule_triggered'],
-                             a['status'], a['transaction_id'], a['amount'], a['country'], a['created_at'])
-                        )
-                    except Exception as e:
-                        pass
+            print(f"Batch inserting {len(alerts_to_insert)} alerts...")
+            try:
+                if alerts_to_insert:
+                    psycopg2.extras.execute_batch(
+                        cur,
+                        """INSERT INTO alerts (alert_id, customer_id, customer_name, risk_level, rule_triggered, status, transaction_id, amount, country, created_at)
+                           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                           ON CONFLICT (alert_id) DO NOTHING""",
+                        alerts_to_insert,
+                        page_size=500
+                    )
+            except Exception as e:
+                print(f"Failed to batch insert alerts: {e}")
 
             self.conn.commit()
             cur.close()

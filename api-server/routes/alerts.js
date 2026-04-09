@@ -93,6 +93,36 @@ router.patch('/:alertId/status', authenticateToken, async (req, res) => {
 router.post('/', authenticateToken, async (req, res) => {
   try {
     const alerts = Array.isArray(req.body) ? req.body : [req.body];
+    if (alerts.length === 0) return res.json({ inserted: 0 });
+
+    // --- Auto-create missing customers to satisfy FK ---
+    const uniqueCustomerIds = [...new Set(alerts.map(a => a.customer_id).filter(Boolean))];
+    if (uniqueCustomerIds.length > 0) {
+      const existingRes = await pool.query(
+        'SELECT customer_id FROM customers WHERE customer_id = ANY($1)',
+        [uniqueCustomerIds]
+      );
+      const existingIds = new Set(existingRes.rows.map(r => r.customer_id));
+      const missingIds = uniqueCustomerIds.filter(id => !existingIds.has(id));
+
+      if (missingIds.length > 0) {
+        console.log(`Auto-creating ${missingIds.length} missing customers for alerts...`);
+        const cVals = [];
+        const cRows = [];
+        let cIdx = 1;
+        for (const cid of missingIds) {
+          cRows.push(`($${cIdx++}, $${cIdx++}, $${cIdx++}, $${cIdx++})`);
+          cVals.push(cid, `ACC-${cid}`, `Customer ${cid}`, `customer ${cid}`);
+        }
+        await pool.query(
+          `INSERT INTO customers (customer_id, account_number, name, normalized_name)
+           VALUES ${cRows.join(', ')}
+           ON CONFLICT (customer_id) DO NOTHING`,
+          cVals
+        );
+      }
+    }
+
     let inserted = 0;
 
     for (const a of alerts) {
@@ -108,7 +138,7 @@ router.post('/', authenticateToken, async (req, res) => {
     res.json({ inserted });
   } catch (err) {
     console.error('Insert alerts error:', err);
-    res.status(500).json({ error: 'Failed to insert alerts' });
+    res.status(500).json({ error: 'Failed to insert alerts: ' + err.message });
   }
 });
 

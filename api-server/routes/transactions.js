@@ -4,10 +4,14 @@ const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
-// GET /api/transactions — fetch all with optional filters
+// GET /api/transactions — fetch all with optional filters and pagination
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const { startDate, endDate, minAmount, maxAmount, country, rule } = req.query;
+    const { startDate, endDate, minAmount, maxAmount, country, rule, page } = req.query;
+    // Allow up to 5000 rows per page, default 500
+    const limit = Math.min(parseInt(req.query.limit) || 500, 5000);
+    const offset = ((parseInt(page) || 1) - 1) * limit;
+
     let query = 'SELECT * FROM transactions WHERE 1=1';
     const params = [];
     let idx = 1;
@@ -19,7 +23,8 @@ router.get('/', authenticateToken, async (req, res) => {
     if (country) { query += ` AND country = $${idx++}`; params.push(country); }
     if (rule) { query += ` AND rule_triggered ILIKE $${idx++}`; params.push(`%${rule}%`); }
 
-    query += ' ORDER BY transaction_date DESC LIMIT 50';
+    query += ` ORDER BY transaction_date DESC LIMIT $${idx++} OFFSET $${idx++}`;
+    params.push(limit, offset);
 
     const { rows } = await pool.query(query, params);
     res.json(rows);
@@ -51,39 +56,99 @@ router.post('/', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Array of transactions required' });
     }
 
+    // --- Step 1: Auto-create any missing customers so FK constraint is satisfied ---
+    const uniqueCustomerIds = [...new Set(
+      transactions.map(t => t.customer_id).filter(Boolean)
+    )];
+
+    if (uniqueCustomerIds.length > 0) {
+      // Find which customer_ids already exist
+      const existingRes = await pool.query(
+        'SELECT customer_id FROM customers WHERE customer_id = ANY($1)',
+        [uniqueCustomerIds]
+      );
+      const existingIds = new Set(existingRes.rows.map(r => r.customer_id));
+      const missingIds = uniqueCustomerIds.filter(id => !existingIds.has(id));
+
+      // Bulk-insert placeholder customers for any missing IDs
+      if (missingIds.length > 0) {
+        console.log(`Auto-creating ${missingIds.length} placeholder customers for FK satisfaction...`);
+        const custValues = [];
+        const custRows = [];
+        let ci = 1;
+        for (const cid of missingIds) {
+          // customer_id, account_number (unique), name, normalized_name
+          const accNum = `ACC-${cid}`;
+          const name = `Customer ${cid}`;
+          custRows.push(`($${ci++}, $${ci++}, $${ci++}, $${ci++})`);
+          custValues.push(cid, accNum, name, name.toLowerCase());
+        }
+        // Insert in chunks of 200 to avoid param limits
+        const CUST_CHUNK = 200;
+        for (let i = 0; i < missingIds.length; i += CUST_CHUNK) {
+          const chunkIds = missingIds.slice(i, i + CUST_CHUNK);
+          const cVals = [];
+          const cRows = [];
+          let cIdx = 1;
+          for (const cid of chunkIds) {
+            cRows.push(`($${cIdx++}, $${cIdx++}, $${cIdx++}, $${cIdx++})`);
+            cVals.push(cid, `ACC-${cid}`, `Customer ${cid}`, `customer ${cid}`);
+          }
+          await pool.query(
+            `INSERT INTO customers (customer_id, account_number, name, normalized_name)
+             VALUES ${cRows.join(', ')}
+             ON CONFLICT (customer_id) DO NOTHING`,
+            cVals
+          );
+        }
+      }
+    }
+
+    // --- Step 2: Bulk insert transactions ---
     let inserted = 0;
-    // Batch insert in chunks of 100
-    for (let i = 0; i < transactions.length; i += 100) {
-      const chunk = transactions.slice(i, i + 100);
+    const CHUNK_SIZE = 100;
+    
+    for (let i = 0; i < transactions.length; i += CHUNK_SIZE) {
+      const chunk = transactions.slice(i, i + CHUNK_SIZE);
+      const valueRows = [];
+      const values = [];
+      let pIdx = 1;
 
       for (const t of chunk) {
-        await pool.query(
-          `INSERT INTO transactions (
-            transaction_id, customer_id, account_number, amount, transaction_date,
-            transaction_type, country, country_risk_level, is_new_device,
-            degree_centrality, path_length_hops, balance_before, balance_after,
-            days_since_last_transaction, user_transaction_count_7d, transaction_frequency_1hr,
-            destination_id, flagged, flag_reason, rule_triggered, risk_score, batch_id
-          ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22
-          )
-          ON CONFLICT (transaction_id) DO NOTHING`,
-          [
-            t.transaction_id, t.customer_id, t.account_number, t.amount, t.transaction_date,
-            t.transaction_type, t.country, t.country_risk_level, t.is_new_device,
-            t.degree_centrality, t.path_length_hops, t.balance_before, t.balance_after,
-            t.days_since_last_transaction, t.user_transaction_count_7d, t.transaction_frequency_1hr,
-            t.destination_id, t.flagged, t.flag_reason, t.rule_triggered, t.risk_score, t.batch_id || null
-          ]
+        const row = [];
+        for (let j = 0; j < 22; j++) {
+          row.push(`$${pIdx++}`);
+        }
+        valueRows.push(`(${row.join(', ')})`);
+        
+        values.push(
+          t.transaction_id, t.customer_id, t.account_number, t.amount, t.transaction_date,
+          t.transaction_type, t.country, t.country_risk_level, t.is_new_device,
+          t.degree_centrality, t.path_length_hops, t.balance_before, t.balance_after,
+          t.days_since_last_transaction, t.user_transaction_count_7d, t.transaction_frequency_1hr,
+          t.destination_id, t.flagged, t.flag_reason, t.rule_triggered, t.risk_score, t.batch_id || null
         );
-        inserted++;
       }
+
+      const query = `
+        INSERT INTO transactions (
+          transaction_id, customer_id, account_number, amount, transaction_date,
+          transaction_type, country, country_risk_level, is_new_device,
+          degree_centrality, path_length_hops, balance_before, balance_after,
+          days_since_last_transaction, user_transaction_count_7d, transaction_frequency_1hr,
+          destination_id, flagged, flag_reason, rule_triggered, risk_score, batch_id
+        ) VALUES ${valueRows.join(', ')}
+        ON CONFLICT (transaction_id) DO NOTHING
+      `;
+
+      const result = await pool.query(query, values);
+      inserted += result.rowCount;
     }
 
     res.json({ inserted });
   } catch (err) {
     console.error('Insert transactions error:', err);
-    res.status(500).json({ error: 'Failed to insert transactions' });
+    res.status(500).json({ error: 'Failed to insert transactions: ' + err.message });
   }
 });
 

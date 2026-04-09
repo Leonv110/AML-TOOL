@@ -123,6 +123,7 @@ export default function IngestionPage() {
             }
 
             // 2. Prepare Data for PostgreSQL
+            const batchId = `BATCH-${Date.now()}`;
             const formattedData = parsedData.map(row => ({
                 transaction_id:               row['transaction_id']?.toString(),
                 customer_id:                  row['customer_id']?.toString(),
@@ -148,6 +149,7 @@ export default function IngestionPage() {
                 flag_reason:                  null,
                 rule_triggered:               null,
                 risk_score:                   null,
+                batch_id:                     batchId
             }));
 
             setProgress(50);
@@ -172,9 +174,9 @@ export default function IngestionPage() {
 
             setProgress(100);
             setStatus({ type: 'success', message: `Successfully ingested ${formattedData.length} records.` });
-            logEvent('DATA_UPLOAD_TRANSACTION', 'transactions', null, { count: formattedData.length, filename: file?.name });
+            logEvent('DATA_UPLOAD_TRANSACTION', 'transactions', null, { count: formattedData.length, filename: file?.name, batch_id: batchId });
             setUploadComplete(true);
-            setUploadedBatchId(null);
+            setUploadedBatchId(batchId);
             setFile(null);
             setPreview(null);
 
