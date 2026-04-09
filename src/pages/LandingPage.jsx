@@ -239,48 +239,24 @@ function FeatureCard({ icon, title, desc }) {
   );
 }
 
-const NetworkAnimation = () => (
-  <div className="hero-svg-container">
-    <svg viewBox="0 0 800 600" className="network-svg" preserveAspectRatio="xMidYMid slice">
-      <defs>
-        <radialGradient id="glow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="var(--gafa-accent)" stopOpacity="0.4" />
-          <stop offset="100%" stopColor="var(--gafa-accent)" stopOpacity="0" />
-        </radialGradient>
-      </defs>
+const HolographicGlobe = () => (
+  <div className="holographic-globe-container">
+    <div className="globe-core">
+      <div className="globe-surface"></div>
       
-      {/* Dynamic Network Lines */}
-      <g className="network-lines">
-        <path d="M 200,300 L 400,200 L 600,250 L 500,450 Z" stroke="var(--gafa-accent)" strokeOpacity="0.3" strokeWidth="1" fill="none" />
-        <path d="M 400,200 L 500,100 L 650,150 L 600,250" stroke="var(--gafa-accent)" strokeOpacity="0.2" strokeWidth="1" fill="none" />
-        <path d="M 200,300 L 100,250 L 150,150 L 400,200" stroke="var(--gafa-accent)" strokeOpacity="0.15" strokeWidth="1" fill="none" />
-        <path d="M 500,450 L 600,550 L 750,400 L 600,250" stroke="var(--gafa-accent)" strokeOpacity="0.2" strokeWidth="1" fill="none" />
-        <path d="M 200,300 L 250,500 L 400,550 L 500,450" stroke="var(--gafa-accent)" strokeOpacity="0.15" strokeWidth="1" fill="none" />
-      </g>
+      {/* Orbital Rings */}
+      <div className="orbit orbit-1"></div>
+      <div className="orbit orbit-2"></div>
+      <div className="orbit orbit-3"></div>
+      
+      {/* Orbiting Satellites / Nodes */}
+      <div className="satellite sat-1"></div>
+      <div className="satellite sat-2"></div>
+      <div className="satellite sat-3"></div>
+      <div className="satellite sat-4"></div>
 
-      {/* Grid pattern / Globe rings represent global data */}
-      <ellipse cx="400" cy="300" rx="300" ry="100" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="1" className="globe-ring-1" />
-      <ellipse cx="400" cy="300" rx="100" ry="300" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="1" className="globe-ring-2" />
-      <circle cx="400" cy="300" r="280" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="1" className="globe-ring-3" />
-
-      {/* Nodes */}
-      <g className="nodes">
-        <circle cx="400" cy="200" r="6" fill="var(--gafa-brand-green)" className="node-pulse" />
-        <circle cx="400" cy="200" r="24" fill="url(#glow)" className="node-glow" />
-        
-        <circle cx="200" cy="300" r="4" fill="var(--gafa-accent)" />
-        <circle cx="600" cy="250" r="5" fill="var(--gafa-accent)" className="node-float-1" />
-        <circle cx="500" cy="450" r="4" fill="var(--gafa-brand-green)" />
-        <circle cx="500" cy="100" r="3" fill="var(--gafa-accent)" className="node-float-2" />
-        <circle cx="650" cy="150" r="4" fill="var(--gafa-accent)" />
-        <circle cx="100" cy="250" r="3" fill="var(--gafa-brand-green)" className="node-float-3" />
-        <circle cx="150" cy="150" r="4" fill="var(--gafa-accent)" />
-        <circle cx="600" cy="550" r="3" fill="var(--gafa-accent)" />
-        <circle cx="750" cy="400" r="4" fill="var(--gafa-brand-green)" className="node-float-1" />
-        <circle cx="250" cy="500" r="3" fill="var(--gafa-accent)" />
-        <circle cx="400" cy="550" r="4" fill="var(--gafa-accent)" />
-      </g>
-    </svg>
+      <div className="glow-overlay"></div>
+    </div>
   </div>
 );
 
