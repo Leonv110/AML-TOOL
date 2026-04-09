@@ -1,93 +1,106 @@
-import { useNavigate, useLocation, Outlet } from 'react-router-dom';
+import { useNavigate, useLocation, Outlet, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { 
+  Shield, LayoutDashboard, Users, UserCheck, Activity, 
+  AlertCircle, Briefcase, FileText, Upload, History, LogOut, Settings
+} from 'lucide-react';
 import './DashboardShell.css';
 
 const NAV_ITEMS = [
-  { path: '/', label: 'Dashboard' },
-  { path: '/customer-master', label: 'Customer Master' },
-  { path: '/customers', label: 'Customers' },
-  { path: '/screening', label: 'Screening' },
-  { path: '/transactions', label: 'Transactions' },
-  { path: '/alerts', label: 'Alert Review' },
-  { path: '/investigations', label: 'Investigations' },
-  { path: '/reports', label: 'Reports' },
-  { path: '/ingestion', label: 'Data Ingestion' },
-  { path: '/audit-log', label: 'Audit Log' },
+  { path: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
+  { path: '/customers', label: 'Customers', icon: <Users size={18} /> },
+  { path: '/screening', label: 'Screening', icon: <UserCheck size={18} /> },
+  { path: '/transactions', label: 'Transactions', icon: <Activity size={18} /> },
+  { path: '/alerts', label: 'Alerts', icon: <AlertCircle size={18} /> },
+  { path: '/investigations', label: 'Investigations', icon: <Briefcase size={18} /> },
+  { path: '/reports', label: 'Reports', icon: <FileText size={18} /> },
+  { path: '/ingestion', label: 'Ingestion', icon: <Upload size={18} /> },
 ];
 
 export default function DashboardShell() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, userRole, logout, sessionWarning, sessionTimeLeft, resetSessionTimer } = useAuth();
+  const { user, userRole, logout } = useAuth();
 
-  function isActive(path) {
-    if (path === '/') return location.pathname === '/';
-    return location.pathname.startsWith(path);
-  }
+  const isActive = (path) => location.pathname === path;
 
   return (
-    <div className="dashboard-shell">
-      {/* Session warning overlay */}
-      {sessionWarning && (
-        <div className="session-warning-overlay">
-          <div className="session-warning-card">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="1.5">
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="12 6 12 12 16 14" />
-            </svg>
-            <h3>Session Expiring</h3>
-            <p>Your session will expire due to inactivity</p>
-            <div className="countdown">{sessionTimeLeft}s</div>
-            <button className="extend-btn" onClick={resetSessionTimer} aria-label="Extend session">
-              Extend Session
-            </button>
+    <div className="dashboard-layout">
+      <div className="liquid-bg" />
+      
+      {/* Sidebar navigation */}
+      <aside className="dash-sidebar glass-panel">
+        <div className="sidebar-brand">
+          <img src="/logo.png" alt="GAFA Logo" style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
+          <div className="brand-text">
+            <h2>GAFA</h2>
+            <span>AML Tool</span>
           </div>
         </div>
-      )}
 
-      {/* Top bar */}
-      <header className="dash-header">
-        <div className="dash-brand" onClick={() => navigate('/')} style={{ cursor: 'pointer' }} role="button" tabIndex={0} aria-label="Go to dashboard">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-          </svg>
-          <span>GAFA</span>
-        </div>
-
-        {/* Navigation */}
-        <nav className="dash-nav" aria-label="Main navigation">
+        <nav className="sidebar-nav">
           {NAV_ITEMS.map(item => (
-            <button
+            <Link 
               key={item.path}
-              className={`nav-item ${isActive(item.path) ? 'active' : ''}`}
-              onClick={() => navigate(item.path)}
-              aria-label={item.label}
-              aria-current={isActive(item.path) ? 'page' : undefined}
+              to={item.path} 
+              className={`nav-link ${isActive(item.path) ? 'active' : ''}`}
             >
-              {item.label}
-            </button>
+              {item.icon}
+              <span>{item.label}</span>
+              {isActive(item.path) && <div className="active-dot" />}
+            </Link>
           ))}
+          
+          {/* Admin link only for admins */}
+          {userRole === 'admin' && (
+            <>
+              <div className="nav-divider" style={{height: '1px', background: 'rgba(255,255,255,0.1)', margin: '1rem 0'}} />
+              <Link 
+                to="/admin-portal" 
+                className={`nav-link admin-link ${isActive('/admin-portal') ? 'active' : ''}`}
+              >
+                <Settings size={18} />
+                <span>Admin Portal</span>
+              </Link>
+              <Link 
+                to="/audit-log" 
+                className={`nav-link ${isActive('/audit-log') ? 'active' : ''}`}
+              >
+                <History size={18} />
+                <span>Audit Logs</span>
+              </Link>
+            </>
+          )}
         </nav>
 
-        <div className="dash-user">
-          <div className="user-info">
-            <span className="user-email">{user?.email}</span>
-            <span className="user-role">{userRole || 'User'}</span>
+        <div className="sidebar-footer">
+          <div className="user-profile glass-card">
+            <div className="user-avatar">{user?.email?.[0].toUpperCase()}</div>
+            <div className="user-meta">
+              <p className="u-email">{user?.email}</p>
+              <p className="u-role">{userRole}</p>
+            </div>
           </div>
-          <button className="logout-btn" onClick={logout} aria-label="Logout">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
-            Logout
+          <button className="gafa-btn logout-action" onClick={logout}>
+            <LogOut size={18} /> Logout
           </button>
         </div>
-      </header>
+      </aside>
 
-      {/* Main content — renders child routes */}
-      <main>
-        <Outlet />
+      {/* Main Content Area */}
+      <main className="dash-main-scroll">
+        <header className="content-header">
+           <div className="breadcrumb">
+              <span>Platform</span> / <span>{NAV_ITEMS.find(n => n.path === location.pathname)?.label || 'System'}</span>
+           </div>
+           <div className="header-status">
+              <span className="pulse-dot" />
+              <span>Network Secure</span>
+           </div>
+        </header>
+        <div className="content-inner">
+          <Outlet />
+        </div>
       </main>
     </div>
   );

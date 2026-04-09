@@ -46,43 +46,73 @@ function formatDate(d) {
   return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-function addHeader(doc, title, refNumber, settings) {
+// Helper to fetch logo asynchronously
+async function getLogoBase64() {
+  try {
+    const res = await fetch('/logo.png');
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch (e) {
+    return null;
+  }
+}
+
+function addHeader(doc, title, refNumber, settings, logoBase64) {
   const s = settings || getSettings();
   const pageWidth = doc.internal.pageSize.getWidth();
 
+  // Draw Premium Header Background Rectangle
+  doc.setFillColor(14, 25, 48); // Dark Navy Blue
+  doc.rect(0, 0, pageWidth, 45, 'F');
+
+  // Draw Accent Line below the header
+  doc.setFillColor(14, 179, 167); // Teal
+  doc.rect(0, 45, pageWidth, 2, 'F');
+
+  if (logoBase64) {
+    // Add Logo
+    doc.addImage(logoBase64, 'PNG', 15, 10, 25, 25);
+  } else {
+    // Fallback shape if logo fetch fails
+    doc.setFillColor(255, 255, 255);
+    doc.circle(27, 22, 10, 'F');
+    doc.setFillColor(14, 179, 167);
+    doc.circle(27, 22, 5, 'F');
+  }
+
   // Institution Header
-  doc.setFontSize(16);
+  doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
-  doc.text(s.institutionName, pageWidth / 2, 20, { align: 'center' });
+  doc.setTextColor(255, 255, 255);
+  doc.text(s.institutionName, 45, 18);
 
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(100);
-  doc.text(s.institutionAddress, pageWidth / 2, 26, { align: 'center' });
-  doc.text(`FIU Registration: ${s.fiuRegistration}`, pageWidth / 2, 31, { align: 'center' });
+  doc.setTextColor(180, 180, 180);
+  doc.text(`${s.institutionAddress}  |  FIU Reg: ${s.fiuRegistration}`, 45, 26);
 
-  // Divider
-  doc.setDrawColor(200);
-  doc.setLineWidth(0.5);
-  doc.line(15, 35, pageWidth - 15, 35);
+  // Reference and Date
+  doc.setFontSize(10);
+  doc.setTextColor(200, 200, 200);
+  doc.text(`Ref: ${refNumber}`, pageWidth - 15, 18, { align: 'right' });
+  doc.setFontSize(8);
+  doc.text(`${new Date().toLocaleString('en-IN')}`, pageWidth - 15, 26, { align: 'right' });
 
-  // Report Title
+  // Report Title Badge
+  doc.setFillColor(41, 65, 105);
+  doc.rect(15, 52, pageWidth - 30, 12, 'F');
   doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(0);
-  doc.text(title, pageWidth / 2, 43, { align: 'center' });
+  doc.setTextColor(255, 255, 255);
+  doc.text(title, pageWidth / 2, 60, { align: 'center' });
 
-  // Ref Number + Date
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(100);
-  doc.text(`Reference: ${refNumber}`, 15, 50);
-  doc.text(`Generated: ${new Date().toLocaleString('en-IN')}`, pageWidth - 15, 50, { align: 'right' });
-
-  doc.setDrawColor(220);
-  doc.line(15, 53, pageWidth - 15, 53);
-
-  return 58; // y position after header
+  return 75; // y position after header
 }
 
 function addFooter(doc, pageNum, totalPages, settings) {
@@ -111,12 +141,13 @@ function generateRefNumber(type) {
 // ============================================================
 // 1. CTR — Cash Transaction Report
 // ============================================================
-export function generateCTR(transactions, params = {}) {
+export async function generateCTR(transactions, params = {}) {
   const settings = getSettings();
   const doc = new jsPDF('landscape', 'mm', 'a4');
   const refNumber = generateRefNumber('CTR');
-
-  let y = addHeader(doc, 'CASH TRANSACTION REPORT (CTR)', refNumber, settings);
+  
+  const logoBase64 = await getLogoBase64();
+  let y = addHeader(doc, 'CASH TRANSACTION REPORT (CTR)', refNumber, settings, logoBase64);
 
   // Report Parameters
   doc.setFontSize(9);
@@ -202,13 +233,14 @@ export function generateCTR(transactions, params = {}) {
 // ============================================================
 // 2. STR — Suspicious Transaction Report
 // ============================================================
-export function generateSTR(investigation, customer, transactions, sarData = {}) {
+export async function generateSTR(investigation, customer, transactions, sarData = {}) {
   const settings = getSettings();
   const doc = new jsPDF('portrait', 'mm', 'a4');
   const refNumber = generateRefNumber('STR');
   const pageWidth = doc.internal.pageSize.getWidth();
 
-  let y = addHeader(doc, 'SUSPICIOUS TRANSACTION REPORT (STR)', refNumber, settings);
+  const logoBase64 = await getLogoBase64();
+  let y = addHeader(doc, 'SUSPICIOUS TRANSACTION REPORT (STR)', refNumber, settings, logoBase64);
 
   // Section 1: Case Information
   doc.setFontSize(10);
@@ -385,13 +417,14 @@ export function generateSTR(investigation, customer, transactions, sarData = {})
 // ============================================================
 // 3. Risk Assessment Report
 // ============================================================
-export function generateRiskAssessment(customers, params = {}) {
+export async function generateRiskAssessment(customers, params = {}) {
   const settings = getSettings();
   const doc = new jsPDF('portrait', 'mm', 'a4');
   const refNumber = generateRefNumber('RISK');
   const pageWidth = doc.internal.pageSize.getWidth();
 
-  let y = addHeader(doc, 'CUSTOMER RISK ASSESSMENT REPORT', refNumber, settings);
+  const logoBase64 = await getLogoBase64();
+  let y = addHeader(doc, 'CUSTOMER RISK ASSESSMENT REPORT', refNumber, settings, logoBase64);
 
   // Executive Summary
   doc.setFontSize(10);

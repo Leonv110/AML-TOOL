@@ -28,7 +28,7 @@ router.get('/kpis', authenticateToken, async (req, res) => {
 router.get('/analyst-stats', authenticateToken, async (req, res) => {
   try {
     const [alertsRes, investigationsRes] = await Promise.all([
-      pool.query("SELECT assigned_to, status, created_at, updated_at FROM alerts WHERE status != 'open'"),
+      pool.query("SELECT assigned_to, status, created_at FROM alerts WHERE status != 'open'"),
       pool.query('SELECT assigned_to, status FROM investigations'),
     ]);
 

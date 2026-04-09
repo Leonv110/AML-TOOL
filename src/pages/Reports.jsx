@@ -164,7 +164,7 @@ function CTRForm() {
     if (!preview || preview.length === 0) return;
     setGenerating(true);
     try {
-      const result = generateCTR(preview, { startDate, endDate, threshold, transactionType: txnType });
+      const result = await generateCTR(preview, { startDate, endDate, threshold, transactionType: txnType });
 
       // Save report metadata
       await apiPost('/api/reports', {
@@ -305,7 +305,7 @@ function RiskForm() {
       const customers = await apiGet(`/api/reports/risk-data${params}`);
       setCustomerCount(customers.length);
 
-      const result = generateRiskAssessment(customers, {
+      const result = await generateRiskAssessment(customers, {
         startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
         endDate: new Date(),
         assessmentType: riskFilter === 'ALL' ? 'Comprehensive' : `${riskFilter} Risk Only`,

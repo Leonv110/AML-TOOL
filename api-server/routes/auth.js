@@ -112,6 +112,38 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// GET /api/auth/seed-admin — temp bootstrap
+router.get('/seed-admin', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const email = 'admin@gafa.org';
+    const existing = await client.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (existing.rows.length === 0) {
+      const salt = await bcrypt.genSalt(10);
+      const hash = await bcrypt.hash('admin123', salt);
+      const userRes = await client.query(
+        'INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id',
+        [email, hash]
+      );
+      await client.query(
+        'INSERT INTO profiles (id, email, role) VALUES ($1, $2, $3)',
+        [userRes.rows[0].id, email, 'admin']
+      );
+      res.json({ message: 'Admin seeded successfully' });
+    } else {
+        const salt = await bcrypt.genSalt(10);
+        const hash = await bcrypt.hash('admin123', salt);
+        await client.query('UPDATE users SET password_hash = $1 WHERE email = $2', [hash, email]);
+        await client.query('UPDATE profiles SET role = $1 WHERE email = $2', ['admin', email]);
+      res.json({ message: 'Admin already exists. Password reset to admin123' });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+});
+
 // GET /api/auth/me — get current user from token
 router.get('/me', authenticateToken, async (req, res) => {
   try {

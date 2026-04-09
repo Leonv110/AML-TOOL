@@ -371,7 +371,7 @@ export default function InvestigationWorkspace() {
                 className="btn btn-primary"
                 onClick={async () => {
                   try {
-                    const result = generateSTR(investigation, customer, transactions, sarData);
+                    const result = await generateSTR(investigation, customer, transactions, sarData);
                     // Save report metadata
                     await apiPost('/api/reports', {
                       report_type: 'STR',

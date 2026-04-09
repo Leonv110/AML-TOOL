@@ -1,11 +1,15 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import AdminRoute from './components/AdminRoute';
+import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
+import AdminLogin from './pages/AdminLogin';
+import TermsPage from './pages/TermsPage';
+import PrivacyPage from './pages/PrivacyPage';
 import DashboardShell from './pages/DashboardShell';
 import DashboardPage from './pages/DashboardPage';
 import CustomerMaster from './pages/CustomerMaster';
-import CustomerRisk from './pages/CustomerRisk';
 import CustomerDirectory from './pages/CustomerDirectory';
 import CustomerProfile from './pages/CustomerProfile';
 import Screening from './pages/Screening';
@@ -16,13 +20,19 @@ import InvestigationWorkspace from './pages/InvestigationWorkspace';
 import Reports from './pages/Reports';
 import AuditLog from './pages/AuditLog';
 import IngestionPage from './pages/IngestionPage';
+import AdminPanel from './pages/AdminPanel';
 
 function App() {
     return (
         <BrowserRouter>
             <AuthProvider>
                 <Routes>
+                    <Route path="/" element={<LandingPage />} />
                     <Route path="/login" element={<LoginPage />} />
+                    <Route path="/terms" element={<TermsPage />} />
+                    <Route path="/privacy" element={<PrivacyPage />} />
+                    <Route path="/admin" element={<AdminLogin />} />
+                    
                     <Route
                         element={
                             <ProtectedRoute>
@@ -30,7 +40,12 @@ function App() {
                             </ProtectedRoute>
                         }
                     >
-                        <Route path="/" element={<DashboardPage />} />
+                        <Route path="/dashboard" element={<DashboardPage />} />
+                        <Route path="/admin-portal" element={
+                            <AdminRoute>
+                                <AdminPanel />
+                            </AdminRoute>
+                        } />
                         <Route path="/customer-master" element={<CustomerMaster />} />
                         <Route path="/customers" element={<CustomerDirectory />} />
                         <Route path="/customers/:id" element={<CustomerProfile />} />

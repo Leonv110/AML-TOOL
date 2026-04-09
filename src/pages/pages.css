@@ -108,9 +108,17 @@
   line-height: 1;
 }
 
-.kpi-card.high .kpi-value { color: var(--risk-high); }
-.kpi-card.alert .kpi-value { color: var(--brand-accent); }
-.kpi-card.sar .kpi-value { color: #a78bfa; }
+.kpi-card.high .kpi-value {
+  color: var(--risk-high);
+}
+
+.kpi-card.alert .kpi-value {
+  color: var(--brand-accent);
+}
+
+.kpi-card.sar .kpi-value {
+  color: #a78bfa;
+}
 
 /* --- Tables --- */
 .data-table {
@@ -205,7 +213,8 @@
   border: 1px solid rgba(245, 158, 11, 0.25);
 }
 
-.status-badge.closed, .status-badge.resolved {
+.status-badge.closed,
+.status-badge.resolved {
   background: rgba(34, 197, 94, 0.12);
   color: #22c55e;
   border: 1px solid rgba(34, 197, 94, 0.25);
@@ -256,9 +265,17 @@
   transition: width 0.5s ease;
 }
 
-.risk-bar-fill.high { background: var(--risk-high); }
-.risk-bar-fill.medium { background: var(--risk-medium); }
-.risk-bar-fill.low { background: var(--risk-low); }
+.risk-bar-fill.high {
+  background: var(--risk-high);
+}
+
+.risk-bar-fill.medium {
+  background: var(--risk-medium);
+}
+
+.risk-bar-fill.low {
+  background: var(--risk-low);
+}
 
 /* --- Forms --- */
 .form-group {
@@ -370,7 +387,8 @@
   background: rgba(245, 158, 11, 0.03);
 }
 
-.upload-zone:hover, .upload-zone.dragging {
+.upload-zone:hover,
+.upload-zone.dragging {
   border-color: var(--brand-accent);
   background: rgba(245, 158, 11, 0.08);
 }
@@ -501,7 +519,9 @@
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* --- Tabs --- */
@@ -623,11 +643,11 @@
   transition: 0.3s;
 }
 
-.toggle-switch input:checked + .toggle-slider {
+.toggle-switch input:checked+.toggle-slider {
   background: var(--risk-low);
 }
 
-.toggle-switch input:checked + .toggle-slider::before {
+.toggle-switch input:checked+.toggle-slider::before {
   transform: translateX(18px);
 }
 
@@ -636,9 +656,11 @@
   .page-container {
     padding: 1rem;
   }
+
   .panels-row {
     grid-template-columns: 1fr;
   }
+
   .kpi-grid {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -660,9 +682,17 @@
   line-height: 1;
 }
 
-.risk-score-number.high { color: var(--risk-high); }
-.risk-score-number.medium { color: var(--risk-medium); }
-.risk-score-number.low { color: var(--risk-low); }
+.risk-score-number.high {
+  color: var(--risk-high);
+}
+
+.risk-score-number.medium {
+  color: var(--risk-medium);
+}
+
+.risk-score-number.low {
+  color: var(--risk-low);
+}
 
 .risk-score-tier {
   font-family: 'JetBrains Mono', monospace;
@@ -678,10 +708,12 @@
   background: rgba(239, 68, 68, 0.15);
   color: #ef4444;
 }
+
 .risk-score-tier.medium {
   background: rgba(245, 158, 11, 0.15);
   color: #f59e0b;
 }
+
 .risk-score-tier.low {
   background: rgba(34, 197, 94, 0.15);
   color: #22c55e;
@@ -899,13 +931,18 @@
 
 /* --- Skeleton Loading --- */
 @keyframes skeleton-shimmer {
-  0% { background-position: -200px 0; }
-  100% { background-position: calc(200px + 100%) 0; }
+  0% {
+    background-position: -200px 0;
+  }
+
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
 }
 
 .skeleton-pulse {
   animation: skeleton-shimmer 1.5s ease-in-out infinite;
-  background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.04) 25%, rgba(255, 255, 255, 0.08) 50%, rgba(255, 255, 255, 0.04) 75%);
   background-size: 200px 100%;
 }
 
@@ -921,7 +958,7 @@
   align-items: center;
   gap: 1rem;
   padding: 0.85rem 1rem;
-  border-bottom: 1px solid rgba(255,255,255,0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
 }
 
 .skeleton-row.header {
@@ -932,7 +969,7 @@
   height: 0.75rem;
   border-radius: 4px;
   animation: skeleton-shimmer 1.5s ease-in-out infinite;
-  background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.05) 25%, rgba(255, 255, 255, 0.1) 50%, rgba(255, 255, 255, 0.05) 75%);
   background-size: 200px 100%;
 }
 
@@ -974,4 +1011,3 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-

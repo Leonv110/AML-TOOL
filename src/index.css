@@ -1,98 +1,194 @@
-
-/* ======================================
-   Global Styles — Forensic Data Hub
-   ====================================== */
+/* ============================================================ */
+/* GAFA AML TOOL - DESIGN SYSTEM (CORPORATE LIQUID GLASS)       */
+/* ============================================================ */
 
 :root {
-    /* Core Colors */
-    --bg-primary: #0a0e1a;
-    --bg-secondary: #111827;
-    --bg-card: rgba(15, 23, 42, 0.85);
-    --text-primary: #e2e8f0;
-    --text-secondary: #94a3b8;
-    --text-muted: #475569;
-    --accent: #38bdf8;
-    --accent-hover: #7dd3fc;
-    --danger: #ef4444;
-    --success: #22c55e;
-    --warning: #f59e0b;
-    --border: rgba(71, 85, 105, 0.3);
+  /* Corporate Liquid Glass Palette (Matched to new logo) */
+  --gafa-deep: #081024;
+  --gafa-surface: rgba(14, 25, 48, 0.7);
+  --gafa-glass: rgba(255, 255, 255, 0.04);
+  --gafa-glass-border: rgba(255, 255, 255, 0.08);
+  
+  /* Primary brand colors from the new logo */
+  --gafa-accent: #0eb3a7; /* Teal */
+  --gafa-accent-glow: rgba(14, 179, 167, 0.2);
+  --gafa-brand-green: #a2db47; /* Lime/Light Green */
+  
+  --gafa-text: #f0f2f5;
+  --gafa-text-dim: #94a3b8;
+  --gafa-success: #10b981;
+  --gafa-danger: #f43f5e;
+  --gafa-warning: #f59e0b;
 
-    /* Fonts */
-    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  /* Typography */
+  --font-main: 'Outfit', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Effects */
+  --glass-blur: blur(24px);
+  --transition-smooth: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  --liquid-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
 }
 
-*,
-*::before,
-*::after {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-}
-
-html {
-    font-size: 16px;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 body {
-    font-family: var(--font-sans);
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    line-height: 1.5;
-    min-height: 100vh;
+  font-family: var(--font-main);
+  background: var(--gafa-deep);
+  color: var(--gafa-text);
+  overflow-x: hidden;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
 }
 
-#root {
-    min-height: 100vh;
+/* Base Liquid Background Animation (Subdued, Corporate) */
+.liquid-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: -2;
+  background: radial-gradient(circle at 50% 10%, #15254b 0%, #081024 100%);
 }
 
-/* Scrollbar */
+.liquid-blob {
+  position: fixed;
+  width: 700px;
+  height: 700px;
+  background: rgba(14, 179, 167, 0.05); /* Very faint teal */
+  filter: blur(100px);
+  border-radius: 50%;
+  z-index: -1;
+  animation: liquidFloat 25s infinite alternate ease-in-out;
+  pointer-events: none;
+}
+
+@keyframes liquidFloat {
+  0% { transform: translate(-10%, -10%) scale(1); }
+  50% { transform: translate(15%, 10%) scale(1.1); }
+  100% { transform: translate(-5%, 20%) scale(0.9); }
+}
+
+/* Glassmorphism Components */
+.glass-panel {
+  background: var(--gafa-surface);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--gafa-glass-border);
+  border-radius: 12px;
+  box-shadow: var(--liquid-shadow);
+  transition: var(--transition-smooth);
+}
+
+.glass-panel:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.glass-card {
+  background: var(--gafa-glass);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--gafa-glass-border);
+  border-radius: 8px;
+  padding: 1.5rem;
+  transition: var(--transition-smooth);
+}
+
+.glass-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-3px);
+}
+
+/* Interactive Elements */
+button.gafa-btn {
+  padding: 0.8rem 1.7rem;
+  border-radius: 8px;
+  border: none;
+  font-family: var(--font-main);
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+button.gafa-btn-primary {
+  background: var(--gafa-accent);
+  color: #000;
+  box-shadow: 0 4px 15px rgba(14, 179, 167, 0.2);
+}
+
+button.gafa-btn-primary:hover {
+  background: #11cbbb;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(14, 179, 167, 0.3);
+}
+
+input.gafa-input {
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--gafa-glass-border);
+  padding: 0.9rem 1.2rem;
+  border-radius: 8px;
+  color: white;
+  width: 100%;
+  transition: var(--transition-smooth);
+  font-family: var(--font-main);
+}
+
+input.gafa-input:focus, select.gafa-select:focus {
+  outline: none;
+  border-color: var(--gafa-accent);
+  background: rgba(0, 0, 0, 0.25);
+  box-shadow: 0 0 0 3px rgba(14, 179, 167, 0.1);
+}
+
+select.gafa-select {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  background-size: 1em;
+}
+
+select.gafa-select option {
+  background-color: var(--gafa-deep);
+  color: var(--gafa-text);
+  padding: 10px;
+}
+
+/* Typography Utilities */
+.text-gradient {
+  background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.accent-gradient {
+  background: linear-gradient(135deg, var(--gafa-accent) 0%, var(--gafa-brand-green) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Scrollbar Branding */
 ::-webkit-scrollbar {
-    width: 6px;
+  width: 6px;
 }
 
 ::-webkit-scrollbar-track {
-    background: var(--bg-primary);
+  background: var(--gafa-deep);
 }
 
 ::-webkit-scrollbar-thumb {
-    background: rgba(71, 85, 105, 0.4);
-    border-radius: 3px;
+  background: var(--gafa-glass-border);
+  border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: rgba(71, 85, 105, 0.6);
-}
-
-/* Selection */
-::selection {
-    background: rgba(56, 189, 248, 0.25);
-    color: #e2e8f0;
-}
-
-/* Focus outline for accessibility */
-:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-}
-
-/* Smooth transitions for all interactive elements */
-a,
-button,
-input,
-select,
-textarea {
-    transition: all 0.2s ease;
-}
-
-a {
-    color: var(--accent);
-    text-decoration: none;
-}
-
-a:hover {
-    color: var(--accent-hover);
+  background: rgba(255, 255, 255, 0.2);
 }
