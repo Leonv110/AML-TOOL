@@ -21,7 +21,8 @@ router.get('/health-check', async (req, res) => {
 
   try {
     // Check ML Backend (Python)
-    const mlResponse = await axios.get('http://localhost:8000/health', { timeout: 2000 });
+    const amlUrl = process.env.AML_BACKEND_URL || process.env.VITE_AML_BACKEND_URL || 'http://localhost:8000';
+    const mlResponse = await axios.get(`${amlUrl}/health`, { timeout: 2000 });
     if (mlResponse.data && mlResponse.data.status === 'ok') {
       health.ml = 'online';
     }

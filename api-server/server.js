@@ -50,7 +50,27 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Keep-Alive Mechanism to prevent Render from spinning down free tier services
+const axios = require('axios');
+function keepAlive() {
+  const nodeUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+  axios.get(`${nodeUrl}/health`)
+    .then(res => console.log(`[Keep-Alive] Node API Pinged - Status: ${res.status}`))
+    .catch(err => console.log(`[Keep-Alive] Node API Ping Failed:`, err.message));
+
+  const amlUrl = process.env.AML_BACKEND_URL || process.env.VITE_AML_BACKEND_URL;
+  if (amlUrl) {
+    axios.get(`${amlUrl}/health`)
+      .then(res => console.log(`[Keep-Alive] AML Backend Pinged - Status: ${res.status}`))
+      .catch(err => console.log(`[Keep-Alive] AML Backend Ping Failed:`, err.message));
+  }
+}
+// Run every 10 minutes (600,000 ms)
+setInterval(keepAlive, 10 * 60 * 1000);
+
 // Start
 app.listen(PORT, () => {
   console.log(`🚀 GAFA API Server running on http://localhost:${PORT}`);
+  // Ping immediately on boot if in production
+  if (process.env.NODE_ENV === 'production') keepAlive();
 });
