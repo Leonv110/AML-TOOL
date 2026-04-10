@@ -13,6 +13,9 @@ export default function TransactionMonitoring() {
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({ startDate: '', endDate: '', minAmount: '', maxAmount: '', country: '', rule: '' });
   const [countries, setCountries] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
+  const PAGE_SIZE = 100;
 
   useEffect(() => {
     loadData();
@@ -22,7 +25,7 @@ export default function TransactionMonitoring() {
     setLoading(true);
     try {
       const [txns, ruleData] = await Promise.all([
-        fetchAllTransactions(),
+        fetchAllTransactions({ limit: 50000 }),
         fetchRules(),
       ]);
       setTransactions(txns);
@@ -196,45 +199,78 @@ export default function TransactionMonitoring() {
                 </tr>
               </thead>
               <tbody>
-                {transactions.slice(0, 50).map(tx => (
-                  <tr key={tx.transaction_id || tx.id}
-                    className={tx.flagged ? '' : ''}
-                    style={tx.flagged ? { background: 'rgba(239, 68, 68, 0.04)' } : {}}
-                  >
-                    <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.7rem' }}>{tx.transaction_id}</td>
-                    <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.7rem' }}>{tx.customer_id}</td>
-                    <td style={{ fontSize: '0.75rem' }}>
-                      {tx.transaction_date ? new Date(tx.transaction_date).toLocaleDateString() : 'N/A'}
-                    </td>
-                    <td style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 600 }}>
-                      ${parseFloat(tx.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                    </td>
-                    <td style={{ fontSize: '0.75rem' }}>{tx.transaction_type || 'N/A'}</td>
-                    <td>{tx.country || 'N/A'}</td>
-                    <td>
-                      {tx.country_risk_level ? (
-                        <span className={`risk-badge ${(tx.country_risk_level || '').toLowerCase()}`}>
-                          {tx.country_risk_level}
-                        </span>
-                      ) : <span style={{ color: 'var(--text-muted)' }}>N/A</span>}
-                    </td>
-                    <td style={{ fontSize: '0.75rem', color: tx.rule_triggered ? '#f59e0b' : 'var(--text-muted)' }}>
-                      {tx.rule_triggered || 'None'}
-                    </td>
-                    <td>
-                      {tx.flagged ? (
-                        <span className="risk-badge high" style={{ fontSize: '0.6rem' }}>Flagged</span>
-                      ) : (
-                        <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>Clean</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {(() => {
+                  const filtered = showFlaggedOnly ? transactions.filter(t => t.flagged) : transactions;
+                  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+                  const pageData = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+                  return pageData.map(tx => (
+                    <tr key={tx.transaction_id || tx.id}
+                      style={tx.flagged ? { background: 'rgba(239, 68, 68, 0.04)' } : {}}
+                    >
+                      <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.7rem' }}>{tx.transaction_id}</td>
+                      <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.7rem' }}>{tx.customer_id}</td>
+                      <td style={{ fontSize: '0.75rem' }}>
+                        {tx.transaction_date ? new Date(tx.transaction_date).toLocaleDateString() : 'N/A'}
+                      </td>
+                      <td style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 600 }}>
+                        ${parseFloat(tx.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </td>
+                      <td style={{ fontSize: '0.75rem' }}>{tx.transaction_type || 'N/A'}</td>
+                      <td>{tx.country || 'N/A'}</td>
+                      <td>
+                        {tx.country_risk_level ? (
+                          <span className={`risk-badge ${(tx.country_risk_level || '').toLowerCase()}`}>
+                            {tx.country_risk_level}
+                          </span>
+                        ) : <span style={{ color: 'var(--text-muted)' }}>N/A</span>}
+                      </td>
+                      <td style={{ fontSize: '0.75rem', color: tx.rule_triggered ? '#f59e0b' : 'var(--text-muted)' }}>
+                        {tx.rule_triggered || 'None'}
+                      </td>
+                      <td>
+                        {tx.flagged ? (
+                          <span className="risk-badge high" style={{ fontSize: '0.6rem' }}>Flagged</span>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>Clean</span>
+                        )}
+                      </td>
+                    </tr>
+                  ));
+                })()}
               </tbody>
             </table>
-            <div style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)', fontSize: '0.75rem', borderTop: '1px solid var(--border-color)' }}>
-              Showing {Math.min(transactions.length, 50)} of {transactions.length} transactions
-            </div>
+            {/* Pagination + Stats */}
+            {(() => {
+              const filtered = showFlaggedOnly ? transactions.filter(t => t.flagged) : transactions;
+              const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+              const flaggedCount = transactions.filter(t => t.flagged).length;
+              return (
+                <div style={{ padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)' }}>
+                  <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                      Showing {Math.min(filtered.length, PAGE_SIZE)} of {filtered.length} transactions
+                      {flaggedCount > 0 && <span style={{ color: '#ef4444', marginLeft: '0.5rem' }}>({flaggedCount} flagged)</span>}
+                    </span>
+                    <button
+                      className={`btn ${showFlaggedOnly ? 'btn-danger' : 'btn-secondary'}`}
+                      style={{ fontSize: '0.65rem', padding: '0.2rem 0.5rem' }}
+                      onClick={() => { setShowFlaggedOnly(!showFlaggedOnly); setCurrentPage(1); }}
+                    >
+                      {showFlaggedOnly ? '✕ Show All' : '⚑ Flagged Only'}
+                    </button>
+                  </div>
+                  {totalPages > 1 && (
+                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                      <button className="btn btn-secondary" style={{ fontSize: '0.65rem', padding: '0.2rem 0.5rem' }}
+                        disabled={currentPage <= 1} onClick={() => setCurrentPage(p => p - 1)}>← Prev</button>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Page {currentPage} of {totalPages}</span>
+                      <button className="btn btn-secondary" style={{ fontSize: '0.65rem', padding: '0.2rem 0.5rem' }}
+                        disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)}>Next →</button>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </>
         )}
       </div>

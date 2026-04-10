@@ -151,6 +151,7 @@ export async function fetchAllTransactions(filters = {}) {
   if (filters.maxAmount) params.set('maxAmount', filters.maxAmount);
   if (filters.country) params.set('country', filters.country);
   if (filters.rule) params.set('rule', filters.rule);
+  if (filters.limit) params.set('limit', filters.limit);
 
   const qs = params.toString();
   return apiGet(`/api/transactions${qs ? `?${qs}` : ''}`);
