@@ -28,3 +28,20 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+backend/.venv/
+venv/
+ENV/
+
+# Testing & Scratch
+api-server/out.json
+api-server/test_api.js
+api-server/test_db.js
+api-server/countriesMap.json
+screening/
+
