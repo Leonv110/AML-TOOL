@@ -1,4 +1,5 @@
 // api-server/services/amlWatcherService.js
+const axios = require('axios');
 
 /**
  * Request wrapper for AML Watcher API using the permanent API Key.
@@ -17,30 +18,25 @@ const amlWatcherRequest = async (endpoint, payload = null, method = 'POST') => {
     }
 
     try {
-        const options = {
-            method,
+        const url = `https://api.amlwatcher.com${path}`;
+        const config = {
+            method: method.toLowerCase(),
+            url,
             headers: {
-                // For most APIs, this is either passing the API key directly via a custom header:
                 'Api-Key': apiKey,
-                // OR via Authorization header (Adjust based on AML watcher's doc for actual requests e.g., 'Bearer <API_KEY>')
                 'Authorization': `Bearer ${apiKey}`,
                 'Content-Type': 'application/json'
-            }
+            },
+            data: payload
         };
 
-        if (payload && (method === 'POST' || method === 'PUT')) {
-            options.body = JSON.stringify(payload);
-        }
-
-        const response = await fetch(`https://api.amlwatcher.com${path}`, options);
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`AML request failed at ${path}: ${response.status} - ${errorText}`);
-        }
-
-        return await response.json();
+        const response = await axios(config);
+        return response.data;
     } catch (error) {
+        if (error.response) {
+            console.error(`❌ AML API Error (${endpoint}): ${error.response.status}`, error.response.data);
+            throw new Error(`AML request failed at ${path}: ${error.response.status} - ${JSON.stringify(error.response.data)}`);
+        }
         console.error(`❌ AML Request Error (${endpoint}):`, error.message);
         throw error;
     }

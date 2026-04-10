@@ -1,6 +1,7 @@
 const express = require('express');
 const pool = require('../db');
 const { authenticateToken } = require('../middleware/auth');
+const axios = require('axios');
 const { amlWatcherRequest } = require('../services/amlWatcherService');
 
 const router = express.Router();
@@ -169,19 +170,16 @@ router.post('/manual-screen', async (req, res) => {
     };
     cleanObject(payload);
 
-    const response = await fetch('https://api.amlwatcher.com/api/search', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+    const response = await axios.post('https://api.amlwatcher.com/api/search', payload, {
+      headers: { 'Content-Type': 'application/json' }
     });
 
-    const data = await response.json();
-    if (!response.ok) {
-      return res.status(response.status).json({ error: data.message || 'API request failed', details: data });
-    }
-
-    res.json({ success: true, screeningResult: data });
+    res.json({ success: true, screeningResult: response.data });
   } catch (err) {
+    if (err.response) {
+      console.error('Manual Screening API Error:', err.response.data);
+      return res.status(err.response.status).json({ error: err.response.data.message || 'API request failed', details: err.response.data });
+    }
     console.error('Manual Screening error:', err);
     res.status(500).json({ error: 'Failed to screen via AML Watcher' });
   }
