@@ -1,0 +1,43 @@
+﻿commit 50257cefd10984e026d4a97da66ac7632aa2004f
+Author: Dhruvav <dhruvavinay1809@gmail.com>
+Date:   Wed Apr 8 10:57:17 2026 +0530
+
+    Integrate AML Watcher screening API module
+
+ .env.example                             |  12 +-
+ api-server/.env.example                  |   9 -
+ api-server/db.js                         |   5 +-
+ api-server/package-lock.json             |   1 +
+ api-server/routes/audit.js               |  64 ++
+ api-server/routes/auth.js                |  13 +-
+ api-server/routes/customers.js           |  38 ++
+ api-server/routes/dashboard.js           |   2 +-
+ api-server/routes/reports.js             | 181 ++++++
+ api-server/server.js                     |   2 +
+ api-server/services/amlWatcherService.js |  51 ++
+ backend/aml_processor.py                 |  71 +++
+ backend/main.py                          |  79 +++
+ backend/ml/__init__.py                   |   1 +
+ backend/ml/ensemble.py                   | 256 ++++++++
+ backend/requirements.txt                 |   8 +-
+ package-lock.json                        | 591 +++++++-----------
+ package.json                             |   2 +
+ postgres_schema.sql                      |  54 ++
+ src/App.jsx                              |   2 +
+ src/contexts/AuthContext.jsx             |   3 +
+ src/pages/AlertReview.jsx                |   2 +
+ src/pages/AuditLog.jsx                   | 178 ++++++
+ src/pages/CustomerDirectory.jsx          |  44 +-
+ src/pages/CustomerMaster.jsx             |   2 +
+ src/pages/CustomerProfile.jsx            |   4 +
+ src/pages/DashboardPage.jsx              | 110 ++--
+ src/pages/DashboardShell.jsx             |   1 +
+ src/pages/IngestionPage.jsx              |   2 +
+ src/pages/InvestigationWorkspace.jsx     |  38 ++
+ src/pages/Reports.jsx                    | 998 ++++++++++++++++++++++++-------
+ src/pages/TransactionMonitoring.jsx      |   2 +
+ src/pages/pages.css                      |  79 +++
+ src/services/auditService.js             | 110 ++++
+ src/services/dataService.js              |  13 +-
+ src/services/reportGenerator.js          | 557 +++++++++++++++++
+ 36 files changed, 2911 insertions(+), 674 deletions(-)

@@ -1,0 +1,6 @@
+﻿50257cefd10984e026d4a97da66ac7632aa2004f commit	refs/remotes/origin/HEAD
+50257cefd10984e026d4a97da66ac7632aa2004f commit	refs/remotes/origin/main
+a83beb6fbad06cef20196a96b353422c71acfdb1 commit	refs/remotes/origin/Week1-4
+6d14f6e82b69d8030fac84a98f711734459bf1b5 commit	refs/remotes/origin/screening
+7b2699e302e59ae8bc5b16d359a235b0a66cb57b commit	refs/remotes/origin/Transaction_monitoring
+7e3e049c11e2bb10b3f84f1fd4c2d6648ad914c6 commit	refs/remotes/origin/data_ingestion

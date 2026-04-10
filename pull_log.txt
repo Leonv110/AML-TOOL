@@ -1,0 +1,6 @@
+﻿Updating 50257ce..7dbcfa7
+Fast-forward
+ .env.example            | 16 +++++-----------
+ api-server/.env.example | 14 ++++++++++++++
+ 2 files changed, 19 insertions(+), 11 deletions(-)
+ create mode 100644 api-server/.env.example
