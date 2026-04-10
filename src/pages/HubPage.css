@@ -1,0 +1,266 @@
+/* ============================================================
+   HubPage.css — Post-login hub screen styles
+   ============================================================ */
+
+.hub-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  background: #030712;
+}
+
+.hub-bg {
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(59, 130, 246, 0.06) 0%, transparent 70%),
+    radial-gradient(ellipse at 80% 30%, rgba(167, 139, 250, 0.05) 0%, transparent 60%),
+    radial-gradient(ellipse at 50% 80%, rgba(34, 197, 94, 0.04) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* --- Top Bar --- */
+.hub-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(12px);
+  background: rgba(3, 7, 18, 0.8);
+  position: relative;
+  z-index: 10;
+}
+
+.hub-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.hub-logo {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+}
+
+.hub-brand-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.hub-brand-name {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #e2e8f0;
+  letter-spacing: 2px;
+}
+
+.hub-brand-sub {
+  font-size: 0.6rem;
+  color: #64748b;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.hub-user-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.hub-user-info {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.hub-user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: white;
+}
+
+.hub-user-email {
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+.hub-logout-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.hub-logout-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
+/* --- Content --- */
+.hub-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 2rem;
+  position: relative;
+  z-index: 5;
+}
+
+.hub-welcome {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.hub-welcome h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #f1f5f9;
+  margin: 0 0 0.5rem;
+  letter-spacing: -0.5px;
+}
+
+.hub-welcome p {
+  font-size: 1rem;
+  color: #64748b;
+  margin: 0;
+}
+
+/* --- Tile Grid --- */
+.hub-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  max-width: 720px;
+  width: 100%;
+}
+
+.hub-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 2rem 2rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: center;
+  overflow: hidden;
+  font-family: inherit;
+}
+
+.hub-tile::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  border: 1px solid transparent;
+  transition: border-color 0.3s;
+  pointer-events: none;
+}
+
+.hub-tile:hover {
+  transform: translateY(-4px);
+  border-color: var(--tile-color);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    0 0 0 1px var(--tile-color),
+    0 0 40px color-mix(in srgb, var(--tile-color) 15%, transparent);
+  background: var(--tile-gradient);
+}
+
+.hub-tile:active {
+  transform: translateY(-2px);
+}
+
+.hub-tile-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.25rem;
+  transition: transform 0.3s;
+}
+
+.hub-tile:hover .hub-tile-icon {
+  transform: scale(1.1);
+}
+
+.hub-tile-label {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #e2e8f0;
+  margin: 0 0 0.4rem;
+}
+
+.hub-tile-desc {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.hub-tile-arrow {
+  position: absolute;
+  bottom: 1rem;
+  right: 1rem;
+  opacity: 0;
+  transform: translateX(-8px);
+  transition: all 0.3s;
+  color: var(--tile-color);
+}
+
+.hub-tile:hover .hub-tile-arrow {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* --- Responsive --- */
+@media (max-width: 640px) {
+  .hub-grid {
+    grid-template-columns: 1fr;
+    max-width: 400px;
+  }
+
+  .hub-welcome h1 {
+    font-size: 1.5rem;
+  }
+
+  .hub-content {
+    padding: 2rem 1rem;
+  }
+
+  .hub-tile {
+    padding: 2rem 1.5rem 1.5rem;
+  }
+
+  .hub-user-email {
+    display: none;
+  }
+}

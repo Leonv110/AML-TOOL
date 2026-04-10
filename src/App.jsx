@@ -7,6 +7,7 @@ import LoginPage from './pages/LoginPage';
 import AdminLogin from './pages/AdminLogin';
 import TermsPage from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
+import HubPage from './pages/HubPage';
 import DashboardShell from './pages/DashboardShell';
 import DashboardPage from './pages/DashboardPage';
 import CustomerMaster from './pages/CustomerMaster';
@@ -33,6 +34,14 @@ function App() {
                     <Route path="/privacy" element={<PrivacyPage />} />
                     <Route path="/admin" element={<AdminLogin />} />
                     
+                    {/* Hub — post-login landing (no sidebar) */}
+                    <Route path="/hub" element={
+                        <ProtectedRoute>
+                            <HubPage />
+                        </ProtectedRoute>
+                    } />
+
+                    {/* Main app with sidebar */}
                     <Route
                         element={
                             <ProtectedRoute>

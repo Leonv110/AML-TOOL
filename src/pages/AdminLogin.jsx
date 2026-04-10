@@ -15,7 +15,7 @@ export default function AdminLogin() {
     const navigate = useNavigate();
 
     useEffect(() => {
-        if (user) navigate('/dashboard', { replace: true });
+        if (user) navigate('/hub', { replace: true });
     }, [user, navigate]);
 
     const handleSubmit = async (e) => {
@@ -35,7 +35,7 @@ export default function AdminLogin() {
             const result = await login(email, password);
             
             // If we successfully login, we go to dashboard. The Protected routes will handle them.
-            navigate('/dashboard', { replace: true });
+            navigate('/hub', { replace: true });
         } catch (err) {
             // Handled by AuthError
         } finally {

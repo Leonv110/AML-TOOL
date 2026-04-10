@@ -17,7 +17,7 @@ export default function LoginPage() {
     const navigate = useNavigate();
 
     useEffect(() => {
-        if (user) navigate('/dashboard', { replace: true });
+        if (user) navigate('/hub', { replace: true });
     }, [user, navigate]);
 
     const handleSubmit = async (e) => {
@@ -37,7 +37,7 @@ export default function LoginPage() {
             } else {
                 await login(email, password);
             }
-            navigate('/dashboard', { replace: true });
+            navigate('/hub', { replace: true });
         } catch (err) {
             // Error managed by AuthContext
         } finally {
