@@ -294,46 +294,52 @@ export default function IngestionPage() {
             return;
         }
 
-        // Standard Transaction AML flow
-        setAmlProgressMsg("Starting ML Ensembles...");
+        // Transaction AML flow — JS-based rule engine (works without Python backend)
+        setAmlProgressMsg("Fetching uploaded transactions...");
         try {
-            const backendUrl = import.meta.env.VITE_AML_BACKEND_URL || 'http://localhost:8000';
-            const response = await fetch(`${backendUrl}/api/aml/process`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ batch_id: uploadedBatchId })
+            const startTime = Date.now();
+
+            // Step 1: Fetch the transactions we just uploaded
+            setAmlProgress(10);
+            const transactions = await apiGet(`/api/transactions?limit=5000`);
+            const totalTxns = transactions?.length || 0;
+
+            if (totalTxns === 0) {
+                setAmlResult({ processed: 0, flagged: 0, alerts_created: 0, duration_seconds: 0 });
+                setAmlProcessing(false);
+                return;
+            }
+
+            // Step 2: Apply AML rules via the JS engine
+            setAmlProgress(30);
+            setAmlProgressMsg(`Applying AML rules to ${totalTxns.toLocaleString()} transactions...`);
+
+            const alertsCreated = await generateAlertsFromTransactions(transactions);
+            setAmlProgress(80);
+
+            // Step 3: Count flagged transactions
+            setAmlProgressMsg("Counting flagged transactions...");
+            const flaggedTxns = transactions.filter(t =>
+                t.country_risk_level?.toLowerCase() === 'high' ||
+                t.transaction_frequency_1hr > 5 ||
+                t.days_since_last_transaction > 30 ||
+                (t.amount > 9000 && t.amount < 10000) ||
+                t.is_new_device === true
+            ).length;
+
+            setAmlProgress(100);
+            const duration = (Date.now() - startTime) / 1000;
+
+            setAmlResult({
+                processed: totalTxns,
+                flagged: flaggedTxns,
+                alerts_created: alertsCreated,
+                duration_seconds: parseFloat(duration.toFixed(1))
             });
-
-            if (!response.ok) throw new Error('AML processing failed');
-
-            const data = await response.json();
-            const taskId = data.task_id;
-
-            const pollInterval = setInterval(async () => {
-                try {
-                    const res = await fetch(`${backendUrl}/api/aml/progress/${taskId}`);
-                    if (!res.ok) return;
-                    const d = await res.json();
-                    
-                    setAmlProgress(d.progress);
-                    setAmlProgressMsg(d.message);
-                    
-                    if (d.status === "completed") {
-                        clearInterval(pollInterval);
-                        setAmlResult(d.results);
-                        setAmlProcessing(false);
-                    } else if (d.status === "failed") {
-                        clearInterval(pollInterval);
-                        setAmlError(d.error || "Unknown processing error");
-                        setAmlProcessing(false);
-                    }
-                } catch (e) {
-                    console.error("Polling error:", e);
-                }
-            }, 400);
+            setAmlProcessing(false);
 
         } catch (err) {
-            setAmlError(err.message || "AML backend not running. Start the backend with: cd backend && uvicorn main:app --reload");
+            setAmlError(err.message || "AML processing failed. Please try again.");
             setAmlProcessing(false);
         }
     }
