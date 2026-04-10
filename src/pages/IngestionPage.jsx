@@ -299,9 +299,9 @@ export default function IngestionPage() {
         try {
             const startTime = Date.now();
 
-            // Step 1: Fetch the transactions we just uploaded
+            // Step 1: Fetch the transactions we just uploaded (all of them)
             setAmlProgress(10);
-            const transactions = await apiGet(`/api/transactions?limit=5000`);
+            const transactions = await apiGet(`/api/transactions?limit=50000`);
             const totalTxns = transactions?.length || 0;
 
             if (totalTxns === 0) {

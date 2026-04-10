@@ -8,8 +8,8 @@ const router = express.Router();
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const { startDate, endDate, minAmount, maxAmount, country, rule, page } = req.query;
-    // Allow up to 5000 rows per page, default 500
-    const limit = Math.min(parseInt(req.query.limit) || 500, 5000);
+    // Allow up to 50000 rows per page, default 500
+    const limit = Math.min(parseInt(req.query.limit) || 500, 50000);
     const offset = ((parseInt(page) || 1) - 1) * limit;
 
     let query = 'SELECT * FROM transactions WHERE 1=1';
@@ -31,6 +31,57 @@ router.get('/', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('Fetch transactions error:', err);
     res.status(500).json({ error: 'Failed to fetch transactions' });
+  }
+});
+
+// PATCH /api/transactions/flag — batch update flagged status on transactions
+router.patch('/flag', authenticateToken, async (req, res) => {
+  try {
+    const updates = req.body; // Array of { transaction_id, flagged, flag_reason, rule_triggered }
+    if (!Array.isArray(updates) || updates.length === 0) {
+      return res.status(400).json({ error: 'Array of flag updates required' });
+    }
+
+    let updated = 0;
+    const CHUNK_SIZE = 200;
+
+    for (let i = 0; i < updates.length; i += CHUNK_SIZE) {
+      const chunk = updates.slice(i, i + CHUNK_SIZE);
+      const ids = chunk.map(u => u.transaction_id);
+      
+      // Build individual CASE statements for each field
+      let flagReasonCases = '';
+      let ruleTriggeredCases = '';
+      const params = [];
+      let pIdx = 1;
+
+      for (const u of chunk) {
+        flagReasonCases += ` WHEN transaction_id = $${pIdx++} THEN $${pIdx++}`;
+        params.push(u.transaction_id, u.flag_reason || '');
+        ruleTriggeredCases += ` WHEN transaction_id = $${pIdx++} THEN $${pIdx++}`;
+        params.push(u.transaction_id, u.rule_triggered || '');
+      }
+
+      // Add the list of IDs for the WHERE clause
+      const idPlaceholders = ids.map(() => `$${pIdx++}`);
+      params.push(...ids);
+
+      const query = `
+        UPDATE transactions SET
+          flagged = TRUE,
+          flag_reason = CASE ${flagReasonCases} END,
+          rule_triggered = CASE ${ruleTriggeredCases} END
+        WHERE transaction_id IN (${idPlaceholders.join(', ')})
+      `;
+
+      const result = await pool.query(query, params);
+      updated += result.rowCount;
+    }
+
+    res.json({ updated });
+  } catch (err) {
+    console.error('Flag transactions error:', err);
+    res.status(500).json({ error: 'Failed to flag transactions: ' + err.message });
   }
 });
 

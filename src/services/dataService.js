@@ -275,6 +275,7 @@ export async function generateAlertsFromTransactions(transactions) {
     const activeRules = await apiGet('/api/rules');
     const activeRuleNames = new Set((activeRules || []).filter(r => r.status === 'active').map(r => r.name));
     const alertsToInsert = [];
+    const flagUpdates = []; // Track which transactions to flag in the DB
 
     for (const txn of transactions) {
       const ruleResult = applyAMLRules(txn, activeRuleNames);
@@ -291,15 +292,34 @@ export async function generateAlertsFromTransactions(transactions) {
           country: txn.country,
           created_at: new Date().toISOString()
         });
+        flagUpdates.push({
+          transaction_id: txn.transaction_id,
+          flag_reason: ruleResult.rule_name,
+          rule_triggered: ruleResult.rule_name,
+        });
       }
     }
 
+    // Step 1: Create alerts in bulk
     if (alertsToInsert.length > 0) {
-      await apiPost('/api/alerts', alertsToInsert);
+      // Send in batches to avoid payload limits
+      const ALERT_BATCH = 500;
+      for (let i = 0; i < alertsToInsert.length; i += ALERT_BATCH) {
+        await apiPost('/api/alerts', alertsToInsert.slice(i, i + ALERT_BATCH));
+      }
+    }
+
+    // Step 2: Update the transaction records with flagged=true
+    if (flagUpdates.length > 0) {
+      const FLAG_BATCH = 500;
+      for (let i = 0; i < flagUpdates.length; i += FLAG_BATCH) {
+        await apiPatch('/api/transactions/flag', flagUpdates.slice(i, i + FLAG_BATCH));
+      }
     }
 
     return alertsToInsert.length;
-  } catch {
+  } catch (err) {
+    console.error('generateAlertsFromTransactions error:', err);
     return 0;
   }
 }
