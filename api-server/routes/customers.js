@@ -133,4 +133,22 @@ router.post('/:customerId/screen', authenticateToken, async (req, res) => {
   }
 });
 
+// DELETE /api/customers — delete all customers (and all related data)
+router.delete('/', authenticateToken, async (req, res) => {
+  try {
+    // Cascading delete: alerts, transactions, investigations, notes, documents, then customers
+    await pool.query('DELETE FROM notes');
+    await pool.query('DELETE FROM documents');
+    await pool.query('DELETE FROM investigations');
+    await pool.query('DELETE FROM alerts');
+    await pool.query('DELETE FROM transactions');
+    const result = await pool.query('DELETE FROM customers');
+    res.json({ deleted: result.rowCount });
+  } catch (err) {
+    console.error('Delete customers error:', err);
+    res.status(500).json({ error: 'Failed to delete customers' });
+  }
+});
+
 module.exports = router;
+

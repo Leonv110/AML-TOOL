@@ -17,10 +17,13 @@ export default function DashboardPage() {
   async function loadDashboard() {
     setLoading(true);
     try {
-      const [counts, analystStats] = await Promise.all([
+      const [counts, analystStats, recentAlerts] = await Promise.all([
         apiGet('/api/dashboard/counts'),
         apiGet('/api/dashboard/analyst-stats'),
+        apiGet('/api/alerts?status=open'),
       ]);
+      
+      setAlerts(recentAlerts || []);
       
       setStats({
         total: counts.totalCustomers || 0,

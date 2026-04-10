@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut, apiPatch } from '../apiClient';
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../apiClient';
 
 // ============================================================
 // computeRiskScore — Core risk scoring function (pure, no DB)

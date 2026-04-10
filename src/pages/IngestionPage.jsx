@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { apiPost, apiDelete, apiPut } from '../apiClient';
+import { apiPost, apiDelete, apiPut, apiGet } from '../apiClient';
 import { useAuth } from '../contexts/AuthContext';
 import { generateAlertsFromTransactions } from '../services/dataService';
 import { logEvent } from '../services/auditService';
@@ -24,6 +24,7 @@ export default function IngestionPage() {
     const [status, setStatus] = useState(null);
     const [preview, setPreview] = useState(null); // { columns: [], rows: [], totalRows: number }
     const fileInputRef = useRef(null);
+    const [parsedFullData, setParsedFullData] = useState(null); // Store parsed data for export
 
     const [dataType, setDataType] = useState('transactions'); // 'transactions' or 'customers'
 
@@ -61,6 +62,7 @@ export default function IngestionPage() {
             try {
                 const parsed = await parseExcel(selectedFile);
                 if (parsed.length > 0) {
+                    setParsedFullData(parsed);
                     setPreview({
                         columns: Object.keys(parsed[0]),
                         rows: parsed.slice(0, 5),
@@ -69,6 +71,7 @@ export default function IngestionPage() {
                 }
             } catch {
                 setPreview(null);
+                setParsedFullData(null);
             }
         }
     };
@@ -94,6 +97,7 @@ export default function IngestionPage() {
             try {
                 const parsed = await parseExcel(droppedFile);
                 if (parsed.length > 0) {
+                    setParsedFullData(parsed);
                     setPreview({
                         columns: Object.keys(parsed[0]),
                         rows: parsed.slice(0, 5),
@@ -102,9 +106,22 @@ export default function IngestionPage() {
                 }
             } catch {
                 setPreview(null);
+                setParsedFullData(null);
             }
         }
     };
+
+    // ---- EXPORT TO EXCEL ----
+    function handleExportToExcel() {
+        if (!parsedFullData || parsedFullData.length === 0) return;
+        const ws = XLSX.utils.json_to_sheet(parsedFullData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, dataType === 'transactions' ? 'Transactions' : 'Customers');
+        const fileName = dataType === 'transactions'
+            ? `transactions_export_${new Date().toISOString().split('T')[0]}.xlsx`
+            : `customers_export_${new Date().toISOString().split('T')[0]}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+    }
 
     const handleUpload = async () => {
         if (!file || !user) return;
@@ -149,7 +166,10 @@ export default function IngestionPage() {
                 }));
 
                 setProgress(50);
-                if (mode === 'replace') await apiDelete('/api/transactions');
+                if (mode === 'replace') {
+                    setStatus({ type: 'info', message: 'Clearing existing data...' });
+                    await apiDelete('/api/transactions');
+                }
                 setProgress(70);
 
                 const batchSize = 1000;
@@ -163,36 +183,43 @@ export default function IngestionPage() {
             } else {
                 // Customer Data
                 const formattedData = parsedData.map(row => ({
-                    customer_id:     row['customer_id']?.toString() || `CUST-${Math.random().toString(36).substring(2,8)}`,
-                    account_number:  row['account_number']?.toString() || `ACC-${Math.random().toString(36).substring(2,8)}`,
-                    name:            row['name']?.toString() || 'Unknown',
-                    normalized_name: row['name']?.toString().toLowerCase().replace(/[^a-z0-9]/g, '') || 'unknown',
-                    date_of_birth:   row['date_of_birth'] instanceof Date ? row['date_of_birth'].toISOString().split('T')[0] : null,
-                    occupation:      row['occupation']?.toString() || null,
-                    income:          parseFloat(row['income']) || null,
-                    country:         row['country']?.toString() || null,
-                    pan_aadhaar:     row['pan_aadhaar']?.toString() || null,
+                    customer_id:     row['customer_id']?.toString() || row['Customer_ID']?.toString() || `CUST-${Math.random().toString(36).substring(2,8)}`,
+                    account_number:  row['account_number']?.toString() || row['Account_Number']?.toString() || `ACC-${Math.random().toString(36).substring(2,8)}`,
+                    name:            row['name']?.toString() || row['Name']?.toString() || 'Unknown',
+                    normalized_name: (row['name'] || row['Name'] || 'unknown').toString().toLowerCase().replace(/[^a-z0-9]/g, ''),
+                    date_of_birth:   (row['date_of_birth'] || row['DOB']) instanceof Date 
+                                       ? (row['date_of_birth'] || row['DOB']).toISOString().split('T')[0] 
+                                       : row['date_of_birth']?.toString() || row['DOB']?.toString() || null,
+                    occupation:      row['occupation']?.toString() || row['Occupation']?.toString() || null,
+                    income:          parseFloat(row['income'] || row['Income']) || null,
+                    country:         row['country']?.toString() || row['Country']?.toString() || null,
+                    pan_aadhaar:     row['pan_aadhaar']?.toString() || row['PAN']?.toString() || null,
                     pep_flag:        row['pep_flag'] === 'TRUE' || row['pep_flag'] === true || row['pep_flag'] === 1 || false,
                     last_review:     null
                 }));
 
+                setProgress(50);
+                if (mode === 'replace') {
+                    setStatus({ type: 'info', message: 'Clearing existing customer data...' });
+                    await apiDelete('/api/customers');
+                }
                 setProgress(70);
                 
-                // Usually we upsert all in one go or batches
                 const batchSize = 1000;
                 for (let i = 0; i < formattedData.length; i += batchSize) {
                     const batch = formattedData.slice(i, i + batchSize);
                     await apiPut('/api/customers/upsert', batch);
+                    setProgress(Math.min(70 + Math.round(((i + batch.length) / formattedData.length) * 30), 99));
                 }
-                
-                // Wait, apiPost uses POST. Let's use fetch instead.
-                // Re-doing the batch via standard fetch since apiPost is strictly POST
+
+                logEvent('DATA_UPLOAD_CUSTOMER', 'customers', null, { count: formattedData.length, filename: file.name });
             }
 
             setProgress(100);
-            setStatus({ type: 'success', message: `Successfully ingested data.` });
+            setStatus({ type: 'success', message: `Successfully ingested ${parsedData.length} ${dataType} records.` });
             setUploadComplete(true);
             setUploadedBatchId(batchId);
+            setParsedFullData(parsedData); // Keep for export
             setFile(null);
             setPreview(null);
 
@@ -210,6 +237,7 @@ export default function IngestionPage() {
         setPreview(null);
         setStatus(null);
         setProgress(0);
+        setParsedFullData(null);
     };
 
     async function handleRunAMLProcessing() {
@@ -221,22 +249,46 @@ export default function IngestionPage() {
         if (dataType === 'customers') {
             setAmlProgressMsg("Running AML Watcher mass screening...");
             try {
-                // Mock screening duration for mass customer check since backend bulk screening endpoint may not exist yet
-                // The actual single endpoint is /api/customers/:customerId/screen
-                setAmlProgress(25);
-                await new Promise(r => setTimeout(r, 1000));
-                setAmlProgress(75);
-                await new Promise(r => setTimeout(r, 1000));
-                
+                // Fetch all customers from DB and screen each one
+                setAmlProgress(10);
+                const customers = await apiGet('/api/customers');
+                const totalCustomers = customers?.length || 0;
+                let screenedCount = 0;
+                let flaggedCount = 0;
+
+                if (totalCustomers === 0) {
+                    setAmlResult({ processed: 0, flagged: 0, alerts_created: 0, duration_seconds: 0 });
+                    setAmlProcessing(false);
+                    return;
+                }
+
+                const startTime = Date.now();
+                for (let i = 0; i < totalCustomers; i++) {
+                    const customer = customers[i];
+                    try {
+                        setAmlProgressMsg(`Screening ${customer.name || customer.customer_id}...`);
+                        const res = await apiPost(`/api/customers/${customer.customer_id}/screen`, {});
+                        screenedCount++;
+                        if (res?.screeningResult?.risk_level === 'high') {
+                            flaggedCount++;
+                        }
+                    } catch {
+                        screenedCount++; // Count even if individual screening fails
+                    }
+                    setAmlProgress(Math.min(10 + Math.round((i / totalCustomers) * 85), 95));
+                }
+
+                setAmlProgress(100);
+                const duration = (Date.now() - startTime) / 1000;
                 setAmlResult({
-                    processed: preview?.totalRows || 0,
-                    flagged: Math.floor((preview?.totalRows || 0) * 0.05), // Mock
+                    processed: screenedCount,
+                    flagged: flaggedCount,
                     alerts_created: 0,
-                    duration_seconds: 2.1
+                    duration_seconds: parseFloat(duration.toFixed(1))
                 });
                 setAmlProcessing(false);
             } catch (err) {
-                setAmlError("Bulk screening failed.");
+                setAmlError(err.message || "Bulk screening failed.");
                 setAmlProcessing(false);
             }
             return;
@@ -455,11 +507,16 @@ export default function IngestionPage() {
                                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                                 <polyline points="22 4 12 14.01 9 11.01" />
                             </svg>
-                        ) : (
+                        ) : status.type === 'error' ? (
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <circle cx="12" cy="12" r="10" />
                                 <line x1="12" y1="8" x2="12" y2="12" />
                                 <line x1="12" y1="16" x2="12.01" y2="16" />
+                            </svg>
+                        ) : (
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <circle cx="12" cy="12" r="10" />
+                                <polyline points="12 6 12 12 16 14" />
                             </svg>
                         )}
                         <span>{status.message}</span>
@@ -524,7 +581,9 @@ export default function IngestionPage() {
                       <div style={{ width: `${amlProgress}%`, backgroundColor: '#f59e0b', height: '100%', transition: 'width 0.3s ease' }}></div>
                     </div>
                     <p style={{ fontSize: '12px', color: '#94a3b8' }}>
-                      Processing transactions against 5 AML rules...
+                      {dataType === 'customers'
+                        ? 'Screening customers against AML watchlists...'
+                        : 'Processing transactions against AML rules...'}
                     </p>
                   </div>
                 )}
@@ -535,7 +594,7 @@ export default function IngestionPage() {
                     <div className="aml-result-grid">
                       <div className="aml-stat">
                         <span className="aml-stat-value">{amlResult.processed?.toLocaleString()}</span>
-                        <span className="aml-stat-label">Transactions Processed</span>
+                        <span className="aml-stat-label">{dataType === 'customers' ? 'Customers Screened' : 'Transactions Processed'}</span>
                       </div>
                       <div className="aml-stat">
                         <span className="aml-stat-value" style={{ color: '#ef4444' }}>

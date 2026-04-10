@@ -152,11 +152,14 @@ router.post('/', authenticateToken, async (req, res) => {
   }
 });
 
-// DELETE /api/transactions — delete all transactions
+// DELETE /api/transactions — delete all transactions (and related alerts)
 router.delete('/', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query('DELETE FROM transactions');
-    res.json({ deleted: result.rowCount });
+    // Delete alerts first (they reference transactions via transaction_id)
+    const alertResult = await pool.query('DELETE FROM alerts');
+    // Then delete transactions
+    const txnResult = await pool.query('DELETE FROM transactions');
+    res.json({ deleted_transactions: txnResult.rowCount, deleted_alerts: alertResult.rowCount });
   } catch (err) {
     console.error('Delete transactions error:', err);
     res.status(500).json({ error: 'Failed to delete transactions' });
@@ -164,3 +167,4 @@ router.delete('/', authenticateToken, async (req, res) => {
 });
 
 module.exports = router;
+

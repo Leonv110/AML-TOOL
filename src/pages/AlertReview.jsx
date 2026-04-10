@@ -13,6 +13,7 @@ export default function AlertReview() {
   const [statusFilter, setStatusFilter] = useState('');
   const [aiResults, setAiResults] = useState({});
   const [aiLoading, setAiLoading] = useState({});
+  const [actionLoading, setActionLoading] = useState({}); // Track per-alert action in progress
 
   useEffect(() => {
     loadAlerts();
@@ -31,6 +32,10 @@ export default function AlertReview() {
   }
 
   async function handleStatusChange(alert, newStatus) {
+    // Prevent duplicate actions — if already processing or already in target status
+    if (actionLoading[alert.alert_id] || alert.status === newStatus) return;
+
+    setActionLoading(prev => ({ ...prev, [alert.alert_id]: newStatus }));
     try {
       if (newStatus === 'escalated') {
         const authData = await apiGet('/api/auth/me');
@@ -52,6 +57,12 @@ export default function AlertReview() {
       logEvent(`ALERT_${newStatus.toUpperCase()}`, 'alert', alert.alert_id, { customer_id: alert.customer_id, rule: alert.rule_triggered });
     } catch (err) {
       // Handle silently
+    } finally {
+      setActionLoading(prev => {
+        const next = { ...prev };
+        delete next[alert.alert_id];
+        return next;
+      });
     }
   }
 
@@ -154,12 +165,16 @@ export default function AlertReview() {
                           {alert.status === 'open' && (
                             <>
                               <button className="btn btn-success" style={{ fontSize: '0.65rem', padding: '0.25rem 0.5rem' }}
-                                onClick={() => handleStatusChange(alert, 'closed')} aria-label="Close alert">
-                                Close
+                                onClick={() => handleStatusChange(alert, 'closed')}
+                                disabled={!!actionLoading[alert.alert_id]}
+                                aria-label="Close alert">
+                                {actionLoading[alert.alert_id] === 'closed' ? 'Closing...' : 'Close'}
                               </button>
                               <button className="btn btn-danger" style={{ fontSize: '0.65rem', padding: '0.25rem 0.5rem' }}
-                                onClick={() => handleStatusChange(alert, 'escalated')} aria-label="Escalate alert">
-                                Escalate
+                                onClick={() => handleStatusChange(alert, 'escalated')}
+                                disabled={!!actionLoading[alert.alert_id]}
+                                aria-label="Escalate alert">
+                                {actionLoading[alert.alert_id] === 'escalated' ? 'Escalating...' : 'Escalate'}
                               </button>
                             </>
                           )}

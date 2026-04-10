@@ -69,6 +69,16 @@ router.get('/rule-summary', authenticateToken, async (req, res) => {
 router.patch('/:alertId/status', authenticateToken, async (req, res) => {
   try {
     const { status, case_id } = req.body;
+
+    // Guard: prevent duplicate status change (e.g. double-escalation)
+    const existing = await pool.query(
+      'SELECT status FROM alerts WHERE alert_id = $1',
+      [req.params.alertId]
+    );
+    if (existing.rows.length > 0 && existing.rows[0].status === status) {
+      return res.json({ success: true, message: 'Alert already in this status' });
+    }
+
     let query = 'UPDATE alerts SET status = $1';
     const params = [status];
     let idx = 2;

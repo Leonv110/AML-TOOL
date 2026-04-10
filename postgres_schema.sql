@@ -242,5 +242,7 @@ CREATE TABLE IF NOT EXISTS report_schedules (
 
 -- ============================================================
 -- DONE — All tables and seed data created
--- No RLS policies (handled by Express.js API auth layer)
+-- For Supabase deployment: Run supabase_migration.sql for RLS policies
+-- For Express.js deployment: Auth is handled by the API auth middleware
 -- ============================================================
+

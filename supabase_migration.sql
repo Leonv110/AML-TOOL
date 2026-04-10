@@ -143,9 +143,10 @@ ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rules ENABLE ROW LEVEL SECURITY;
 
--- Policies: authenticated users can SELECT/INSERT/UPDATE
+-- Policies: authenticated users can SELECT/INSERT/UPDATE/DELETE
 -- Using DROP + CREATE pattern (PostgreSQL doesn't support IF NOT EXISTS on CREATE POLICY)
 
+-- CUSTOMERS
 DROP POLICY IF EXISTS "Authenticated users can read customers" ON customers;
 CREATE POLICY "Authenticated users can read customers"
   ON customers FOR SELECT TO authenticated USING (true);
@@ -155,7 +156,11 @@ CREATE POLICY "Authenticated users can insert customers"
 DROP POLICY IF EXISTS "Authenticated users can update customers" ON customers;
 CREATE POLICY "Authenticated users can update customers"
   ON customers FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Authenticated users can delete customers" ON customers;
+CREATE POLICY "Authenticated users can delete customers"
+  ON customers FOR DELETE TO authenticated USING (true);
 
+-- TRANSACTIONS
 DROP POLICY IF EXISTS "Authenticated users can read transactions" ON transactions;
 CREATE POLICY "Authenticated users can read transactions"
   ON transactions FOR SELECT TO authenticated USING (true);
@@ -165,7 +170,11 @@ CREATE POLICY "Authenticated users can insert transactions"
 DROP POLICY IF EXISTS "Authenticated users can update transactions" ON transactions;
 CREATE POLICY "Authenticated users can update transactions"
   ON transactions FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Authenticated users can delete transactions" ON transactions;
+CREATE POLICY "Authenticated users can delete transactions"
+  ON transactions FOR DELETE TO authenticated USING (true);
 
+-- ALERTS
 DROP POLICY IF EXISTS "Authenticated users can read alerts" ON alerts;
 CREATE POLICY "Authenticated users can read alerts"
   ON alerts FOR SELECT TO authenticated USING (true);
@@ -175,7 +184,11 @@ CREATE POLICY "Authenticated users can insert alerts"
 DROP POLICY IF EXISTS "Authenticated users can update alerts" ON alerts;
 CREATE POLICY "Authenticated users can update alerts"
   ON alerts FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Authenticated users can delete alerts" ON alerts;
+CREATE POLICY "Authenticated users can delete alerts"
+  ON alerts FOR DELETE TO authenticated USING (true);
 
+-- INVESTIGATIONS
 DROP POLICY IF EXISTS "Authenticated users can read investigations" ON investigations;
 CREATE POLICY "Authenticated users can read investigations"
   ON investigations FOR SELECT TO authenticated USING (true);
@@ -185,21 +198,33 @@ CREATE POLICY "Authenticated users can insert investigations"
 DROP POLICY IF EXISTS "Authenticated users can update investigations" ON investigations;
 CREATE POLICY "Authenticated users can update investigations"
   ON investigations FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Authenticated users can delete investigations" ON investigations;
+CREATE POLICY "Authenticated users can delete investigations"
+  ON investigations FOR DELETE TO authenticated USING (true);
 
+-- DOCUMENTS
 DROP POLICY IF EXISTS "Authenticated users can read documents" ON documents;
 CREATE POLICY "Authenticated users can read documents"
   ON documents FOR SELECT TO authenticated USING (true);
 DROP POLICY IF EXISTS "Authenticated users can insert documents" ON documents;
 CREATE POLICY "Authenticated users can insert documents"
   ON documents FOR INSERT TO authenticated WITH CHECK (true);
+DROP POLICY IF EXISTS "Authenticated users can delete documents" ON documents;
+CREATE POLICY "Authenticated users can delete documents"
+  ON documents FOR DELETE TO authenticated USING (true);
 
+-- NOTES
 DROP POLICY IF EXISTS "Authenticated users can read notes" ON notes;
 CREATE POLICY "Authenticated users can read notes"
   ON notes FOR SELECT TO authenticated USING (true);
 DROP POLICY IF EXISTS "Authenticated users can insert notes" ON notes;
 CREATE POLICY "Authenticated users can insert notes"
   ON notes FOR INSERT TO authenticated WITH CHECK (true);
+DROP POLICY IF EXISTS "Authenticated users can delete notes" ON notes;
+CREATE POLICY "Authenticated users can delete notes"
+  ON notes FOR DELETE TO authenticated USING (true);
 
+-- RULES
 DROP POLICY IF EXISTS "Authenticated users can read rules" ON rules;
 CREATE POLICY "Authenticated users can read rules"
   ON rules FOR SELECT TO authenticated USING (true);
@@ -210,3 +235,4 @@ CREATE POLICY "Authenticated users can update rules"
 -- ============================================================
 -- DONE — All tables, seed data, and RLS policies created
 -- ============================================================
+
