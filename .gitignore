@@ -42,6 +42,5 @@ ENV/
 api-server/out.json
 api-server/test_api.js
 api-server/test_db.js
-api-server/countriesMap.json
 screening/
 
