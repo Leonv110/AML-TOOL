@@ -1011,3 +1011,114 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* --- Screening UI Overhaul CSS --- */
+
+select.form-input option {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  padding: 0.5rem;
+}
+
+select.form-input option:hover,
+select.form-input option:focus,
+select.form-input option:active,
+select.form-input option:checked {
+  background: rgba(245, 158, 11, 0.2);
+}
+
+.country-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--brand-accent);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  padding: 0.25rem 0.6rem;
+  border-radius: 99px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.country-pill button {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--brand-accent);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.country-pill button:hover {
+  color: #fff;
+}
+
+.custom-range-slider {
+  -webkit-appearance: none;
+  width: 100%;
+  background: transparent;
+  margin: 0.5rem 0;
+}
+
+.custom-range-slider::-webkit-slider-runnable-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+}
+
+.custom-range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 18px;
+  width: 18px;
+  border-radius: 50%;
+  background: var(--brand-accent);
+  margin-top: -6px;
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+  transition: transform 0.1s;
+}
+
+.custom-range-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+}
+
+.custom-range-slider:disabled::-webkit-slider-thumb {
+  background: var(--text-muted);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.custom-dropdown-container {
+  position: relative;
+  width: 100%;
+}
+
+.custom-dropdown-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  max-height: 200px;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--brand-accent);
+  border-radius: 8px;
+  z-index: 50;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  margin-top: 0.25rem;
+}
+
+.custom-dropdown-item {
+  padding: 0.5rem 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.custom-dropdown-item:hover {
+  background: rgba(245, 158, 11, 0.15);
+}

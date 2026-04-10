@@ -240,9 +240,21 @@ export async function updateCustomerPEP(customerId, pepFlag) {
 // ============================================================
 // Utility: get distinct countries from customers
 // ============================================================
+// ============================================================
 export async function fetchDistinctCountries() {
   try {
     return await apiGet('/api/customers/countries');
+  } catch {
+    return [];
+  }
+}
+
+// ============================================================
+// Utility: static ISO countries map for KYC/screening form
+// ============================================================
+export async function fetchApiCountries() {
+  try {
+    return await apiGet('/api/countries');
   } catch {
     return [];
   }

@@ -1,3 +1,5 @@
+import { apiPost } from '../apiClient';
+
 // ============================================================
 // screeningService.js — Customer Screening (OpenSanctions placeholder)
 // ============================================================
@@ -104,4 +106,8 @@ function localOpenSanctionsMatch(name, dob, country) {
 export async function screenCustomer(name, dob, country) {
   // ONE-LINE SWAP POINT — replace localOpenSanctionsMatch with real API call above
   return localOpenSanctionsMatch(name, dob, country);
+}
+
+export async function screenCustomerManual(payload) {
+  return await apiPost('/api/customers/manual-screen', payload);
 }

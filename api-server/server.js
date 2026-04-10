@@ -66,6 +66,7 @@ app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/audit', require('./routes/audit'));
 app.use('/api/reports', require('./routes/reports'));
+app.use('/api/countries', require('./routes/countries'));
 
 // Health check
 app.get('/health', (req, res) => {

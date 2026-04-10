@@ -128,6 +128,65 @@ router.post('/:customerId/screen', authenticateToken, async (req, res) => {
   }
 });
 
+// POST /api/customers/manual-screen — Send formatted payload to AML Watcher
+router.post('/manual-screen', async (req, res) => {
+  try {
+    let payload = { ...req.body };
+    const apiKey = process.env.AMLWATCHER_API_KEY;
+
+    if (!apiKey) {
+      return res.status(500).json({ error: 'AML Watcher API Key is not configured on the server.' });
+    }
+    payload.api_key = apiKey;
+
+    if (payload.exact_search) {
+      payload.match_score = 100;
+    }
+
+    if (payload.adverse_media_monitoring) {
+      if (!payload.webhook || !/^https?:\/\//.test(payload.webhook)) {
+        return res.status(400).json({ error: 'A valid webhook URL is required when adverse media monitoring is enabled' });
+      }
+    }
+
+    if (payload.birth_incorporation_date === '00-00-0000') {
+      delete payload.birth_incorporation_date;
+    }
+
+    const cleanObject = (obj) => {
+      Object.keys(obj).forEach(key => {
+        if (obj[key] === null || obj[key] === '') {
+          delete obj[key];
+        } else if (Array.isArray(obj[key]) && obj[key].length === 0) {
+          delete obj[key];
+        } else if (typeof obj[key] === 'object' && !Array.isArray(obj[key])) {
+          cleanObject(obj[key]);
+          if (Object.keys(obj[key]).length === 0) {
+            delete obj[key];
+          }
+        }
+      });
+    };
+    cleanObject(payload);
+
+    const response = await fetch('https://api.amlwatcher.com/api/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      return res.status(response.status).json({ error: data.message || 'API request failed', details: data });
+    }
+
+    res.json({ success: true, screeningResult: data });
+  } catch (err) {
+    console.error('Manual Screening error:', err);
+    res.status(500).json({ error: 'Failed to screen via AML Watcher' });
+  }
+});
+
 // DELETE /api/customers — delete only current user's customers (and related data)
 router.delete('/', authenticateToken, async (req, res) => {
   try {
