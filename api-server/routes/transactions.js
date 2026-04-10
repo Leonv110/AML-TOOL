@@ -4,17 +4,18 @@ const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
-// GET /api/transactions — fetch all with optional filters and pagination
+// GET /api/transactions — fetch user's transactions with optional filters
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const { startDate, endDate, minAmount, maxAmount, country, rule, page } = req.query;
-    // Allow up to 50000 rows per page, default 500
     const limit = Math.min(parseInt(req.query.limit) || 500, 50000);
     const offset = ((parseInt(page) || 1) - 1) * limit;
+    const userId = req.user.id;
 
-    let query = 'SELECT * FROM transactions WHERE 1=1';
-    const params = [];
-    let idx = 1;
+    // Filter by uploaded_by = current user (data isolation)
+    let query = 'SELECT * FROM transactions WHERE (uploaded_by = $1 OR uploaded_by IS NULL)';
+    const params = [userId];
+    let idx = 2;
 
     if (startDate) { query += ` AND transaction_date >= $${idx++}`; params.push(startDate); }
     if (endDate) { query += ` AND transaction_date <= $${idx++}`; params.push(endDate); }
@@ -34,10 +35,10 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-// PATCH /api/transactions/flag — batch update flagged status on transactions
+// PATCH /api/transactions/flag — batch update flagged status on user's transactions
 router.patch('/flag', authenticateToken, async (req, res) => {
   try {
-    const updates = req.body; // Array of { transaction_id, flagged, flag_reason, rule_triggered }
+    const updates = req.body;
     if (!Array.isArray(updates) || updates.length === 0) {
       return res.status(400).json({ error: 'Array of flag updates required' });
     }
@@ -49,7 +50,6 @@ router.patch('/flag', authenticateToken, async (req, res) => {
       const chunk = updates.slice(i, i + CHUNK_SIZE);
       const ids = chunk.map(u => u.transaction_id);
       
-      // Build individual CASE statements for each field
       let flagReasonCases = '';
       let ruleTriggeredCases = '';
       const params = [];
@@ -62,9 +62,12 @@ router.patch('/flag', authenticateToken, async (req, res) => {
         params.push(u.transaction_id, u.rule_triggered || '');
       }
 
-      // Add the list of IDs for the WHERE clause
       const idPlaceholders = ids.map(() => `$${pIdx++}`);
       params.push(...ids);
+
+      // Only update user's own transactions
+      params.push(req.user.id);
+      const userFilter = `$${pIdx++}`;
 
       const query = `
         UPDATE transactions SET
@@ -72,6 +75,7 @@ router.patch('/flag', authenticateToken, async (req, res) => {
           flag_reason = CASE ${flagReasonCases} END,
           rule_triggered = CASE ${ruleTriggeredCases} END
         WHERE transaction_id IN (${idPlaceholders.join(', ')})
+          AND (uploaded_by = ${userFilter} OR uploaded_by IS NULL)
       `;
 
       const result = await pool.query(query, params);
@@ -89,8 +93,8 @@ router.patch('/flag', authenticateToken, async (req, res) => {
 router.get('/customer/:customerId', authenticateToken, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      'SELECT * FROM transactions WHERE customer_id = $1 ORDER BY transaction_date DESC LIMIT 50',
-      [req.params.customerId]
+      'SELECT * FROM transactions WHERE customer_id = $1 AND (uploaded_by = $2 OR uploaded_by IS NULL) ORDER BY transaction_date DESC LIMIT 50',
+      [req.params.customerId, req.user.id]
     );
     res.json(rows);
   } catch (err) {
@@ -99,42 +103,31 @@ router.get('/customer/:customerId', authenticateToken, async (req, res) => {
   }
 });
 
-// POST /api/transactions — insert transactions (batch)
+// POST /api/transactions — insert transactions (batch) with user ownership
 router.post('/', authenticateToken, async (req, res) => {
   try {
     const transactions = req.body;
+    const userId = req.user.id;
+
     if (!Array.isArray(transactions) || transactions.length === 0) {
       return res.status(400).json({ error: 'Array of transactions required' });
     }
 
-    // --- Step 1: Auto-create any missing customers so FK constraint is satisfied ---
+    // --- Step 1: Auto-create any missing customers with user ownership ---
     const uniqueCustomerIds = [...new Set(
       transactions.map(t => t.customer_id).filter(Boolean)
     )];
 
     if (uniqueCustomerIds.length > 0) {
-      // Find which customer_ids already exist
       const existingRes = await pool.query(
-        'SELECT customer_id FROM customers WHERE customer_id = ANY($1)',
-        [uniqueCustomerIds]
+        'SELECT customer_id FROM customers WHERE customer_id = ANY($1) AND (uploaded_by = $2 OR uploaded_by IS NULL)',
+        [uniqueCustomerIds, userId]
       );
       const existingIds = new Set(existingRes.rows.map(r => r.customer_id));
       const missingIds = uniqueCustomerIds.filter(id => !existingIds.has(id));
 
-      // Bulk-insert placeholder customers for any missing IDs
       if (missingIds.length > 0) {
         console.log(`Auto-creating ${missingIds.length} placeholder customers for FK satisfaction...`);
-        const custValues = [];
-        const custRows = [];
-        let ci = 1;
-        for (const cid of missingIds) {
-          // customer_id, account_number (unique), name, normalized_name
-          const accNum = `ACC-${cid}`;
-          const name = `Customer ${cid}`;
-          custRows.push(`($${ci++}, $${ci++}, $${ci++}, $${ci++})`);
-          custValues.push(cid, accNum, name, name.toLowerCase());
-        }
-        // Insert in chunks of 200 to avoid param limits
         const CUST_CHUNK = 200;
         for (let i = 0; i < missingIds.length; i += CUST_CHUNK) {
           const chunkIds = missingIds.slice(i, i + CUST_CHUNK);
@@ -142,11 +135,11 @@ router.post('/', authenticateToken, async (req, res) => {
           const cRows = [];
           let cIdx = 1;
           for (const cid of chunkIds) {
-            cRows.push(`($${cIdx++}, $${cIdx++}, $${cIdx++}, $${cIdx++})`);
-            cVals.push(cid, `ACC-${cid}`, `Customer ${cid}`, `customer ${cid}`);
+            cRows.push(`($${cIdx++}, $${cIdx++}, $${cIdx++}, $${cIdx++}, $${cIdx++})`);
+            cVals.push(cid, `ACC-${cid}`, `Customer ${cid}`, `customer ${cid}`, userId);
           }
           await pool.query(
-            `INSERT INTO customers (customer_id, account_number, name, normalized_name)
+            `INSERT INTO customers (customer_id, account_number, name, normalized_name, uploaded_by)
              VALUES ${cRows.join(', ')}
              ON CONFLICT (customer_id) DO NOTHING`,
             cVals
@@ -155,7 +148,7 @@ router.post('/', authenticateToken, async (req, res) => {
       }
     }
 
-    // --- Step 2: Bulk insert transactions ---
+    // --- Step 2: Bulk insert transactions with uploaded_by ---
     let inserted = 0;
     const CHUNK_SIZE = 100;
     
@@ -167,7 +160,7 @@ router.post('/', authenticateToken, async (req, res) => {
 
       for (const t of chunk) {
         const row = [];
-        for (let j = 0; j < 22; j++) {
+        for (let j = 0; j < 23; j++) {  // 22 original + 1 uploaded_by
           row.push(`$${pIdx++}`);
         }
         valueRows.push(`(${row.join(', ')})`);
@@ -177,7 +170,8 @@ router.post('/', authenticateToken, async (req, res) => {
           t.transaction_type, t.country, t.country_risk_level, t.is_new_device,
           t.degree_centrality, t.path_length_hops, t.balance_before, t.balance_after,
           t.days_since_last_transaction, t.user_transaction_count_7d, t.transaction_frequency_1hr,
-          t.destination_id, t.flagged, t.flag_reason, t.rule_triggered, t.risk_score, t.batch_id || null
+          t.destination_id, t.flagged, t.flag_reason, t.rule_triggered, t.risk_score, t.batch_id || null,
+          userId  // uploaded_by
         );
       }
 
@@ -187,7 +181,8 @@ router.post('/', authenticateToken, async (req, res) => {
           transaction_type, country, country_risk_level, is_new_device,
           degree_centrality, path_length_hops, balance_before, balance_after,
           days_since_last_transaction, user_transaction_count_7d, transaction_frequency_1hr,
-          destination_id, flagged, flag_reason, rule_triggered, risk_score, batch_id
+          destination_id, flagged, flag_reason, rule_triggered, risk_score, batch_id,
+          uploaded_by
         ) VALUES ${valueRows.join(', ')}
         ON CONFLICT (transaction_id) DO NOTHING
       `;
@@ -203,13 +198,14 @@ router.post('/', authenticateToken, async (req, res) => {
   }
 });
 
-// DELETE /api/transactions — delete all transactions (and related alerts)
+// DELETE /api/transactions — delete only current user's transactions (and alerts)
 router.delete('/', authenticateToken, async (req, res) => {
   try {
-    // Delete alerts first (they reference transactions via transaction_id)
-    const alertResult = await pool.query('DELETE FROM alerts');
-    // Then delete transactions
-    const txnResult = await pool.query('DELETE FROM transactions');
+    const userId = req.user.id;
+    // Delete user's alerts first
+    const alertResult = await pool.query('DELETE FROM alerts WHERE uploaded_by = $1', [userId]);
+    // Then delete user's transactions
+    const txnResult = await pool.query('DELETE FROM transactions WHERE uploaded_by = $1', [userId]);
     res.json({ deleted_transactions: txnResult.rowCount, deleted_alerts: alertResult.rowCount });
   } catch (err) {
     console.error('Delete transactions error:', err);
@@ -218,4 +214,3 @@ router.delete('/', authenticateToken, async (req, res) => {
 });
 
 module.exports = router;
-

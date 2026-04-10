@@ -4,12 +4,13 @@ const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
-// GET /api/dashboard/kpis — aggregated dashboard stats
+// GET /api/dashboard/kpis — aggregated dashboard stats (user-scoped)
 router.get('/kpis', authenticateToken, async (req, res) => {
   try {
+    const userId = req.user.id;
     const [custRes, alertRes, sarRes] = await Promise.all([
-      pool.query('SELECT COUNT(*) as count FROM customers'),
-      pool.query("SELECT COUNT(*) as count FROM alerts WHERE status = 'open'"),
+      pool.query('SELECT COUNT(*) as count FROM customers WHERE (uploaded_by = $1 OR uploaded_by IS NULL)', [userId]),
+      pool.query("SELECT COUNT(*) as count FROM alerts WHERE status = 'open' AND (uploaded_by = $1 OR uploaded_by IS NULL)", [userId]),
       pool.query("SELECT COUNT(*) as count FROM investigations WHERE status = 'draft_sar'"),
     ]);
 
@@ -27,8 +28,9 @@ router.get('/kpis', authenticateToken, async (req, res) => {
 // GET /api/dashboard/analyst-stats — analyst performance data
 router.get('/analyst-stats', authenticateToken, async (req, res) => {
   try {
+    const userId = req.user.id;
     const [alertsRes, investigationsRes] = await Promise.all([
-      pool.query("SELECT assigned_to, status, created_at FROM alerts WHERE status != 'open'"),
+      pool.query("SELECT assigned_to, status, created_at FROM alerts WHERE status != 'open' AND (uploaded_by = $1 OR uploaded_by IS NULL)", [userId]),
       pool.query('SELECT assigned_to, status FROM investigations'),
     ]);
 
@@ -42,13 +44,14 @@ router.get('/analyst-stats', authenticateToken, async (req, res) => {
   }
 });
 
-// GET /api/dashboard/counts — individual table counts for dashboard cards
+// GET /api/dashboard/counts — individual table counts (user-scoped)
 router.get('/counts', authenticateToken, async (req, res) => {
   try {
+    const userId = req.user.id;
     const [custRes, highRiskRes, alertRes, sarRes] = await Promise.all([
-      pool.query('SELECT COUNT(*) as count FROM customers'),
-      pool.query("SELECT COUNT(*) as count FROM customers WHERE pep_flag = true"),
-      pool.query("SELECT COUNT(*) as count FROM alerts WHERE status = 'open'"),
+      pool.query('SELECT COUNT(*) as count FROM customers WHERE (uploaded_by = $1 OR uploaded_by IS NULL)', [userId]),
+      pool.query("SELECT COUNT(*) as count FROM customers WHERE pep_flag = true AND (uploaded_by = $1 OR uploaded_by IS NULL)", [userId]),
+      pool.query("SELECT COUNT(*) as count FROM alerts WHERE status = 'open' AND (uploaded_by = $1 OR uploaded_by IS NULL)", [userId]),
       pool.query("SELECT COUNT(*) as count FROM investigations WHERE status = 'draft_sar'"),
     ]);
 

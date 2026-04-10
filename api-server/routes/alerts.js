@@ -4,19 +4,21 @@ const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
-// GET /api/alerts — fetch alerts with optional status filter
+// GET /api/alerts — fetch user's alerts with optional status filter
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const { status } = req.query;
-    let query = 'SELECT * FROM alerts';
-    const params = [];
+    const userId = req.user.id;
+    let query = 'SELECT * FROM alerts WHERE (uploaded_by = $1 OR uploaded_by IS NULL)';
+    const params = [userId];
+    let idx = 2;
 
     if (status && status !== 'all') {
-      query += ' WHERE status = $1';
+      query += ` AND status = $${idx++}`;
       params.push(status);
     }
 
-    query += ' ORDER BY created_at DESC LIMIT 50';
+    query += ' ORDER BY created_at DESC LIMIT 200';
 
     const { rows } = await pool.query(query, params);
     res.json(rows);
@@ -26,12 +28,12 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-// GET /api/alerts/customer/:customerId — alerts for a customer
+// GET /api/alerts/customer/:customerId — alerts for a customer (user-scoped)
 router.get('/customer/:customerId', authenticateToken, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      'SELECT * FROM alerts WHERE customer_id = $1 ORDER BY created_at DESC',
-      [req.params.customerId]
+      'SELECT * FROM alerts WHERE customer_id = $1 AND (uploaded_by = $2 OR uploaded_by IS NULL) ORDER BY created_at DESC',
+      [req.params.customerId, req.user.id]
     );
     res.json(rows);
   } catch (err) {
@@ -40,12 +42,12 @@ router.get('/customer/:customerId', authenticateToken, async (req, res) => {
   }
 });
 
-// GET /api/alerts/count/:ruleName — count alerts by rule
+// GET /api/alerts/count/:ruleName — count alerts by rule (user-scoped)
 router.get('/count/:ruleName', authenticateToken, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      'SELECT COUNT(*) as count FROM alerts WHERE rule_triggered = $1',
-      [req.params.ruleName]
+      'SELECT COUNT(*) as count FROM alerts WHERE rule_triggered = $1 AND (uploaded_by = $2 OR uploaded_by IS NULL)',
+      [req.params.ruleName, req.user.id]
     );
     res.json({ count: parseInt(rows[0].count, 10) });
   } catch (err) {
@@ -54,10 +56,13 @@ router.get('/count/:ruleName', authenticateToken, async (req, res) => {
   }
 });
 
-// GET /api/alerts/rule-summary — get rule_triggered values for all alerts
+// GET /api/alerts/rule-summary — get rule_triggered values (user-scoped)
 router.get('/rule-summary', authenticateToken, async (req, res) => {
   try {
-    const { rows } = await pool.query('SELECT rule_triggered FROM alerts');
+    const { rows } = await pool.query(
+      'SELECT rule_triggered FROM alerts WHERE (uploaded_by = $1 OR uploaded_by IS NULL)',
+      [req.user.id]
+    );
     res.json(rows);
   } catch (err) {
     console.error('Fetch rule summary error:', err);
@@ -70,10 +75,10 @@ router.patch('/:alertId/status', authenticateToken, async (req, res) => {
   try {
     const { status, case_id } = req.body;
 
-    // Guard: prevent duplicate status change (e.g. double-escalation)
+    // Guard: prevent duplicate status change
     const existing = await pool.query(
-      'SELECT status FROM alerts WHERE alert_id = $1',
-      [req.params.alertId]
+      'SELECT status FROM alerts WHERE alert_id = $1 AND (uploaded_by = $2 OR uploaded_by IS NULL)',
+      [req.params.alertId, req.user.id]
     );
     if (existing.rows.length > 0 && existing.rows[0].status === status) {
       return res.json({ success: true, message: 'Alert already in this status' });
@@ -88,8 +93,8 @@ router.patch('/:alertId/status', authenticateToken, async (req, res) => {
       params.push(case_id);
     }
 
-    query += ` WHERE alert_id = $${idx}`;
-    params.push(req.params.alertId);
+    query += ` WHERE alert_id = $${idx++} AND (uploaded_by = $${idx++} OR uploaded_by IS NULL)`;
+    params.push(req.params.alertId, req.user.id);
 
     await pool.query(query, params);
     res.json({ success: true });
@@ -99,13 +104,14 @@ router.patch('/:alertId/status', authenticateToken, async (req, res) => {
   }
 });
 
-// POST /api/alerts — insert alerts (batch)
+// POST /api/alerts — insert alerts (batch) with user ownership
 router.post('/', authenticateToken, async (req, res) => {
   try {
     const alerts = Array.isArray(req.body) ? req.body : [req.body];
+    const userId = req.user.id;
     if (alerts.length === 0) return res.json({ inserted: 0 });
 
-    // --- Auto-create missing customers to satisfy FK ---
+    // Auto-create missing customers
     const uniqueCustomerIds = [...new Set(alerts.map(a => a.customer_id).filter(Boolean))];
     if (uniqueCustomerIds.length > 0) {
       const existingRes = await pool.query(
@@ -121,11 +127,11 @@ router.post('/', authenticateToken, async (req, res) => {
         const cRows = [];
         let cIdx = 1;
         for (const cid of missingIds) {
-          cRows.push(`($${cIdx++}, $${cIdx++}, $${cIdx++}, $${cIdx++})`);
-          cVals.push(cid, `ACC-${cid}`, `Customer ${cid}`, `customer ${cid}`);
+          cRows.push(`($${cIdx++}, $${cIdx++}, $${cIdx++}, $${cIdx++}, $${cIdx++})`);
+          cVals.push(cid, `ACC-${cid}`, `Customer ${cid}`, `customer ${cid}`, userId);
         }
         await pool.query(
-          `INSERT INTO customers (customer_id, account_number, name, normalized_name)
+          `INSERT INTO customers (customer_id, account_number, name, normalized_name, uploaded_by)
            VALUES ${cRows.join(', ')}
            ON CONFLICT (customer_id) DO NOTHING`,
           cVals
@@ -137,10 +143,10 @@ router.post('/', authenticateToken, async (req, res) => {
 
     for (const a of alerts) {
       await pool.query(
-        `INSERT INTO alerts (alert_id, customer_id, customer_name, risk_level, rule_triggered, status, transaction_id, amount, country, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        `INSERT INTO alerts (alert_id, customer_id, customer_name, risk_level, rule_triggered, status, transaction_id, amount, country, created_at, uploaded_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          ON CONFLICT (alert_id) DO NOTHING`,
-        [a.alert_id, a.customer_id, a.customer_name, a.risk_level, a.rule_triggered, a.status || 'open', a.transaction_id, a.amount, a.country, a.created_at || new Date().toISOString()]
+        [a.alert_id, a.customer_id, a.customer_name, a.risk_level, a.rule_triggered, a.status || 'open', a.transaction_id, a.amount, a.country, a.created_at || new Date().toISOString(), userId]
       );
       inserted++;
     }
