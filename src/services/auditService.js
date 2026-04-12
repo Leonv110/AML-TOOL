@@ -5,7 +5,10 @@
 
 import { apiGet, apiPost, getToken } from '../apiClient';
 
-const HMAC_SECRET = import.meta.env.VITE_AUDIT_HMAC_SECRET || 'gafa-audit-default-key';
+const HMAC_SECRET = import.meta.env.VITE_AUDIT_HMAC_SECRET;
+if (!HMAC_SECRET) {
+  console.warn('⚠️ VITE_AUDIT_HMAC_SECRET is not set — audit log integrity verification will be weakened');
+}
 
 // --- HMAC-SHA256 using Web Crypto API ---
 async function computeHMAC(message) {

@@ -3,6 +3,7 @@ import {
   Activity, Server, Database, Brain, Cpu, HardDrive, 
   Terminal, AlertTriangle, CheckCircle2, RefreshCw, BarChart 
 } from 'lucide-react';
+import { apiGet } from '../apiClient';
 import './AdminPanel.css';
 
 export default function AdminPanel() {
@@ -27,8 +28,7 @@ export default function AdminPanel() {
   useEffect(() => {
     const checkHealth = async () => {
       try {
-        const res = await fetch('http://localhost:3001/api/admin/health-check');
-        const data = await res.json();
+        const data = await apiGet('/api/admin/health-check');
         setStats(prev => ({
           ...prev,
           dbStatus: data.db,
