@@ -378,64 +378,71 @@ export function applyAMLRules(transaction, activeRuleNames, contextTxns = []) {
 }
 
 export async function generateAlertsFromTransactions(transactions) {
-  try {
-    const activeRules = await apiGet('/api/rules');
-    const activeRuleNames = new Set((activeRules || []).filter(r => r.status === 'active').map(r => r.name));
-    const alertsToInsert = [];
-    const flagUpdates = []; // Track which transactions to flag in the DB
-
-    // Group transactions by customer for clustering context
-    const txnsByCustomer = {};
-    for (const txn of transactions) {
-      if (!txnsByCustomer[txn.customer_id]) txnsByCustomer[txn.customer_id] = [];
-      txnsByCustomer[txn.customer_id].push(txn);
-    }
-
-    for (const txn of transactions) {
-      const contextTxns = txnsByCustomer[txn.customer_id] || [];
-      const ruleResult = applyAMLRules(txn, activeRuleNames, contextTxns);
-      if (ruleResult.triggered) {
-        alertsToInsert.push({
-          alert_id: `ALT-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
-          customer_id: txn.customer_id || txn.user_id,
-          customer_name: txn.customer_name || `Customer ${txn.customer_id || txn.user_id}`,
-          risk_level: ruleResult.severity,
-          rule_triggered: ruleResult.rule_name,
-          status: 'open',
-          transaction_id: txn.transaction_id,
-          amount: txn.amount,
-          country: txn.country,
-          created_at: new Date().toISOString()
-        });
-        flagUpdates.push({
-          transaction_id: txn.transaction_id,
-          flag_reason: ruleResult.rule_name,
-          rule_triggered: ruleResult.rule_name,
-          risk_score: ruleResult.score
-        });
-      }
-    }
-
-    // Step 1: Create alerts in bulk
-    if (alertsToInsert.length > 0) {
-      // Send in batches to avoid payload limits
-      const ALERT_BATCH = 500;
-      for (let i = 0; i < alertsToInsert.length; i += ALERT_BATCH) {
-        await apiPost('/api/alerts', alertsToInsert.slice(i, i + ALERT_BATCH));
-      }
-    }
-
-    // Step 2: Update the transaction records with flagged=true
-    if (flagUpdates.length > 0) {
-      const FLAG_BATCH = 500;
-      for (let i = 0; i < flagUpdates.length; i += FLAG_BATCH) {
-        await apiPatch('/api/transactions/flag', flagUpdates.slice(i, i + FLAG_BATCH));
-      }
-    }
-
-    return alertsToInsert.length;
-  } catch (err) {
-    console.error('generateAlertsFromTransactions error:', err);
-    return 0;
+  const activeRules = await apiGet('/api/rules');
+  
+  if (!activeRules || !Array.isArray(activeRules)) {
+    throw new Error('Failed to fetch AML rules. Please re-login and try again.');
   }
+  
+  const activeRuleNames = new Set(activeRules.filter(r => r.status === 'active').map(r => r.name));
+  console.log(`[AML] Active rules (${activeRuleNames.size}):`, [...activeRuleNames]);
+  
+  if (activeRuleNames.size === 0) {
+    throw new Error('No active rules found. Go to Transaction Monitoring → Rule Library to activate rules.');
+  }
+  
+  const alertsToInsert = [];
+  const flagUpdates = [];
+
+  // Group transactions by customer for clustering context
+  const txnsByCustomer = {};
+  for (const txn of transactions) {
+    if (!txnsByCustomer[txn.customer_id]) txnsByCustomer[txn.customer_id] = [];
+    txnsByCustomer[txn.customer_id].push(txn);
+  }
+
+  for (const txn of transactions) {
+    const contextTxns = txnsByCustomer[txn.customer_id] || [];
+    const ruleResult = applyAMLRules(txn, activeRuleNames, contextTxns);
+    if (ruleResult.triggered) {
+      alertsToInsert.push({
+        alert_id: `ALT-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+        customer_id: txn.customer_id || txn.user_id,
+        customer_name: txn.customer_name || `Customer ${txn.customer_id || txn.user_id}`,
+        risk_level: ruleResult.severity,
+        rule_triggered: ruleResult.rule_name,
+        status: 'open',
+        transaction_id: txn.transaction_id,
+        amount: txn.amount,
+        country: txn.country,
+        created_at: new Date().toISOString()
+      });
+      flagUpdates.push({
+        transaction_id: txn.transaction_id,
+        flag_reason: ruleResult.rule_name,
+        rule_triggered: ruleResult.rule_name,
+        risk_score: ruleResult.score
+      });
+    }
+  }
+
+  console.log(`[AML] ${alertsToInsert.length} alerts to create, ${flagUpdates.length} transactions to flag`);
+
+  // Step 1: Create alerts in bulk
+  if (alertsToInsert.length > 0) {
+    const ALERT_BATCH = 500;
+    for (let i = 0; i < alertsToInsert.length; i += ALERT_BATCH) {
+      await apiPost('/api/alerts', alertsToInsert.slice(i, i + ALERT_BATCH));
+    }
+  }
+
+  // Step 2: Update the transaction records with flagged=true
+  if (flagUpdates.length > 0) {
+    const FLAG_BATCH = 500;
+    for (let i = 0; i < flagUpdates.length; i += FLAG_BATCH) {
+      await apiPatch('/api/transactions/flag', flagUpdates.slice(i, i + FLAG_BATCH));
+    }
+  }
+
+  return alertsToInsert.length;
 }

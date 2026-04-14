@@ -302,11 +302,26 @@ export default function IngestionPage() {
             // Step 1: Fetch only UNFLAGGED transactions to process
             setAmlProgress(10);
             const allTxns = await apiGet(`/api/transactions?limit=50000`);
-            const transactions = (allTxns || []).filter(t => !t.flagged);
+            
+            if (!allTxns || !Array.isArray(allTxns)) {
+                setAmlError("Failed to fetch transactions. Please re-login and try again.");
+                setAmlProcessing(false);
+                return;
+            }
+            
+            console.log(`[AML] Fetched ${allTxns.length} total transactions`);
+            
+            // Filter to only unflagged transactions (flagged is null, false, or undefined)
+            const transactions = allTxns.filter(t => t.flagged !== true && t.flagged !== 'true');
             const totalTxns = transactions.length;
+            
+            console.log(`[AML] ${totalTxns} unflagged transactions to process (${allTxns.length - totalTxns} already flagged)`);
 
             if (totalTxns === 0) {
-                setAmlResult({ processed: 0, flagged: 0, alerts_created: 0, duration_seconds: 0 });
+                const msg = allTxns.length > 0 
+                    ? `All ${allTxns.length} transactions are already flagged. Upload new data or clear existing.`
+                    : 'No transactions found. Please upload transaction data first.';
+                setAmlResult({ processed: 0, flagged: 0, alerts_created: 0, duration_seconds: 0, message: msg });
                 setAmlProcessing(false);
                 return;
             }
@@ -629,7 +644,7 @@ export default function IngestionPage() {
                       </div>
                     </div>
                     <p style={{ fontSize: '12px', color: '#94a3b8', marginTop: '12px' }}>
-                      View results in Alert Review and Transaction Monitoring
+                      {amlResult.message || 'View results in Alert Review and Transaction Monitoring'}
                     </p>
                   </div>
                 )}
