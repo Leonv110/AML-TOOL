@@ -31,7 +31,7 @@ export default function DashboardShell() {
       {/* Sidebar navigation */}
       <aside className="dash-sidebar glass-panel">
         <div className="sidebar-brand">
-          <img src="/logo.png" alt="GAFA Logo" style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
+          <img src="/logo.webp" alt="GAFA Logo" style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
           <div className="brand-text">
             <h2>GAFA</h2>
             <span>AML Tool</span>

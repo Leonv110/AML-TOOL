@@ -34,6 +34,34 @@
   font-size: 1.05rem;
 }
 
+/* Tab Toggle Buttons */
+.tab-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.2rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  background: rgba(0,0,0,0.2) !important;
+  color: #94a3b8 !important;
+  transition: all 0.25s ease;
+  cursor: pointer;
+}
+
+.tab-toggle:hover {
+  border-color: rgba(14, 179, 167, 0.3) !important;
+  color: #e2e8f0 !important;
+}
+
+.tab-toggle.active-toggle {
+  background: rgba(14, 179, 167, 0.15) !important;
+  border-color: rgba(14, 179, 167, 0.4) !important;
+  color: #0eb3a7 !important;
+  box-shadow: 0 0 12px rgba(14, 179, 167, 0.15);
+}
+
 .refresh-btn {
   background: rgba(14, 179, 167, 0.1) !important;
   border: 1px solid rgba(14, 179, 167, 0.3) !important;
@@ -300,10 +328,311 @@
 .log-entry.error .log-type { color: #f87171; }
 .log-msg { color: #e2e8f0; }
 
+/* ======================================================= */
+/* USER MANAGEMENT TAB STYLES                                */
+/* ======================================================= */
+
+.user-mgmt-section {
+  animation: fadeIn 0.4s ease-out;
+}
+
+/* Role Summary Cards */
+.role-summary-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.role-summary-card {
+  padding: 1.5rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.role-summary-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 3px;
+  background: rgba(14, 179, 167, 0.4);
+}
+
+.role-summary-card .role-icon {
+  margin-bottom: 0.75rem;
+  color: #64748b;
+}
+
+.role-summary-card .admin-icon { color: #f59e0b; }
+.role-summary-card .investigator-icon { color: #3b82f6; }
+.role-summary-card .student-icon { color: #10b981; }
+
+.role-summary-card .role-count {
+  font-size: 2.5rem;
+  font-weight: 900;
+  color: white;
+  line-height: 1;
+  margin-bottom: 0.4rem;
+}
+
+.role-summary-card .role-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+
+.total-card::before {
+  background: linear-gradient(90deg, #f59e0b, #3b82f6, #10b981);
+}
+
+/* Create User Button */
+.create-user-btn {
+  background: rgba(14, 179, 167, 0.12) !important;
+  border: 1px solid rgba(14, 179, 167, 0.35) !important;
+  color: #0eb3a7 !important;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.create-user-btn:hover {
+  background: rgba(14, 179, 167, 0.22) !important;
+  box-shadow: 0 0 15px rgba(14, 179, 167, 0.15);
+}
+
+/* Messages */
+.user-msg {
+  padding: 0.8rem 1.2rem;
+  border-radius: 10px;
+  margin-bottom: 1.25rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  animation: fadeIn 0.3s ease;
+}
+
+.success-msg {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #34d399;
+}
+
+.error-msg {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
+/* Create User Form Card */
+.create-user-form-card {
+  margin-bottom: 1.5rem;
+}
+
+.create-user-form {
+  padding: 0 1.5rem 1.5rem;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 2fr 2fr 1fr;
+  gap: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.form-field label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 0.5rem;
+}
+
+.form-field input,
+.form-field select {
+  width: 100%;
+  padding: 0.7rem 1rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  color: #e2e8f0;
+  font-size: 0.9rem;
+  font-family: inherit;
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
+}
+
+.form-field input:focus,
+.form-field select:focus {
+  outline: none;
+  border-color: rgba(14, 179, 167, 0.5);
+  box-shadow: 0 0 0 3px rgba(14, 179, 167, 0.1);
+}
+
+.form-field input::placeholder {
+  color: #475569;
+}
+
+.password-input-wrap {
+  position: relative;
+}
+
+.password-input-wrap input {
+  padding-right: 2.5rem;
+}
+
+.pw-toggle {
+  position: absolute;
+  right: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 0.3rem;
+}
+
+.pw-toggle:hover {
+  color: #e2e8f0;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.submit-btn {
+  background: linear-gradient(135deg, #0eb3a7, #0d9488) !important;
+  color: white !important;
+  font-weight: 800;
+  padding: 0.7rem 2rem;
+  border-radius: 10px;
+  border: none !important;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.submit-btn:hover:not(:disabled) {
+  box-shadow: 0 0 20px rgba(14, 179, 167, 0.3);
+  transform: translateY(-1px);
+}
+
+.submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Users Table */
+.users-table-card {
+  overflow: hidden;
+}
+
+.users-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.users-table thead {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.users-table th {
+  padding: 1rem 1.5rem;
+  text-align: left;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.users-table td {
+  padding: 0.9rem 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  font-size: 0.85rem;
+}
+
+.users-table tbody tr {
+  transition: background 0.2s ease;
+}
+
+.users-table tbody tr:hover {
+  background: rgba(14, 179, 167, 0.04);
+}
+
+.user-email-cell {
+  font-weight: 600;
+  color: #e2e8f0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem !important;
+}
+
+.date-cell {
+  color: #64748b;
+  font-size: 0.8rem !important;
+}
+
+/* Role Pills */
+.role-pill {
+  padding: 0.25rem 0.75rem;
+  border-radius: 50px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  display: inline-block;
+}
+
+.role-pill.admin {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.role-pill.investigator {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.role-pill.student {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+/* Role Change Dropdown */
+.role-select {
+  padding: 0.35rem 0.7rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: #e2e8f0;
+  font-size: 0.75rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.role-select:focus {
+  outline: none;
+  border-color: rgba(14, 179, 167, 0.4);
+}
+
+/* Responsive */
 @media (max-width: 1100px) {
   .health-card { grid-column: span 6; }
   .resource-card { grid-column: span 6; }
   .usage-card { grid-column: span 12; }
+  .role-summary-row { grid-template-columns: repeat(2, 1fr); }
+  .form-row { grid-template-columns: 1fr 1fr; }
 }
 
 @media (max-width: 768px) {
@@ -311,4 +640,7 @@
   .resource-card { grid-column: span 12; }
   .usage-card { grid-column: span 12; }
   .model-metrics { grid-template-columns: 1fr; }
+  .role-summary-row { grid-template-columns: 1fr 1fr; }
+  .form-row { grid-template-columns: 1fr; }
+  .admin-header { flex-direction: column; gap: 1rem; }
 }

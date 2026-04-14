@@ -116,7 +116,7 @@ export default function HubPage() {
       {/* Top Bar */}
       <header className="hub-topbar">
         <div className="hub-brand">
-          <img src="/logo.png" alt="GAFA" className="hub-logo" />
+          <img src="/logo.webp" alt="GAFA" className="hub-logo" />
           <div className="hub-brand-text">
             <span className="hub-brand-name">GAFA</span>
             <span className="hub-brand-sub">AML Tool</span>

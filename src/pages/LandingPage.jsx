@@ -23,7 +23,7 @@ export default function LandingPage() {
       <nav className={`landing-nav ${scrolled ? 'nav-scrolled' : ''}`}>
         <div className="nav-container">
           <div className="nav-logo">
-            <img src="/logo.png" alt="GAFA" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
+            <img src="/logo.webp" alt="GAFA" style={{ width: '32px', height: '32px', objectFit: 'contain' }} />
             <span className="logo-text">GAFA AML</span>
           </div>
           <div className="nav-links">
@@ -178,7 +178,7 @@ export default function LandingPage() {
           <div className="footer-main">
             <div className="footer-brand">
               <div className="nav-logo">
-                <img src="/logo.png" alt="GAFA" style={{ width: '36px', height: '36px', objectFit: 'contain' }} />
+                <img src="/logo.webp" alt="GAFA" style={{ width: '36px', height: '36px', objectFit: 'contain' }} />
                 <span className="logo-text">GAFA AML</span>
               </div>
               <p className="brand-desc">
@@ -219,8 +219,8 @@ export default function LandingPage() {
           <div className="footer-bottom">
             <p>© {new Date().getFullYear()} Global Association of Forensic Accountants. All rights reserved.</p>
             <div className="contact-info">
-              <span><MapPin size={14}/> London, UK</span>
-              <span><Phone size={14}/> +44 (0) 20 7123 4567</span>
+              <span><MapPin size={14}/> GAFA HQ, Mumbai, India</span>
+              <span><Phone size={14}/> +91 (22) 1234 5678</span>
             </div>
           </div>
         </div>

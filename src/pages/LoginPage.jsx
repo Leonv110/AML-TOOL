@@ -56,7 +56,7 @@ export default function LoginPage() {
                 {/* --- Left Panel: Dynamic Information --- */}
                 <div className="auth-info-panel glass-panel">
                     <div className="info-brand">
-                        <img src="/logo.png" alt="GAFA Logo" style={{ width: '48px', height: '48px', objectFit: 'contain' }} />
+                        <img src="/logo.webp" alt="GAFA Logo" style={{ width: '48px', height: '48px', objectFit: 'contain' }} />
                         <h2>Global Association of <br/> Forensic Accountants</h2>
                     </div>
                     

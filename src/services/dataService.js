@@ -4,26 +4,28 @@ import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../apiClient';
 // computeRiskScore — Core risk scoring function (pure, no DB)
 // ============================================================
 export function computeRiskScore(customer, transactions = []) {
-  let country_risk = 0;
   let income_mismatch = 0;
-  let transaction_velocity = 0;
-  let account_factors = 0;
+  let crypto_risk = 0;
+  let profile_risk = 0;
   const rules_triggered = [];
 
-  // --- Country Risk (max 30pts) ---
-  const highRiskCountries = ['nigeria', 'iran', 'north korea', 'myanmar'];
-  const mediumRiskCountries = ['uae', 'pakistan', 'afghanistan'];
-  const customerCountry = (customer.country || '').toLowerCase();
-
-  if (highRiskCountries.includes(customerCountry)) {
-    country_risk = 30;
-    rules_triggered.push('Geographic Risk');
-  } else if (mediumRiskCountries.includes(customerCountry)) {
-    country_risk = 15;
-    rules_triggered.push('Geographic Risk');
+  // 1. Profile Risk (PEP / HNI)
+  if (customer.pep_flag) {
+    profile_risk += 50;
+    rules_triggered.push('PEP Flag');
+  }
+  if (customer.hni_flag || customer.occupation?.toLowerCase().includes('hni')) {
+    profile_risk += 30;
+    rules_triggered.push('HNI Status');
   }
 
-  // --- Income Mismatch (max 25pts) ---
+  // 2. Crypto
+  if (customer.crypto_flag || customer.occupation?.toLowerCase().includes('crypto') || customer.occupation?.toLowerCase().includes('exchange')) {
+    crypto_risk = 50;
+    rules_triggered.push('Cryptocurrency Dealings');
+  }
+
+  // 3. Income Mismatch
   const monthlyIncome = parseFloat(customer.income) || 0;
   if (monthlyIncome > 0 && transactions.length > 0) {
     const thirtyDaysAgo = new Date();
@@ -35,52 +37,15 @@ export function computeRiskScore(customer, transactions = []) {
     const txnSum = recentTxns.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
 
     if (txnSum > 5 * monthlyIncome) {
-      income_mismatch = 25;
-      rules_triggered.push('Structuring');
+      income_mismatch = 50;
+      rules_triggered.push('Income Mismatch (>5x)');
     } else if (txnSum > 3 * monthlyIncome) {
-      income_mismatch = 15;
-      rules_triggered.push('Structuring');
-    } else if (txnSum > 1 * monthlyIncome) {
-      income_mismatch = 5;
+      income_mismatch = 25;
+      rules_triggered.push('Income Mismatch (>3x)');
     }
   }
 
-  // --- Transaction Velocity (max 25pts) ---
-  if (transactions.length > 0) {
-    const txnsByDay = {};
-    transactions.forEach(t => {
-      const day = new Date(t.transaction_date).toISOString().split('T')[0];
-      txnsByDay[day] = (txnsByDay[day] || 0) + 1;
-    });
-    const maxTxnsInDay = Math.max(...Object.values(txnsByDay), 0);
-
-    if (maxTxnsInDay > 10) {
-      transaction_velocity = 25;
-      rules_triggered.push('Velocity Spike');
-    } else if (maxTxnsInDay > 5) {
-      transaction_velocity = 15;
-      rules_triggered.push('Velocity Spike');
-    } else if (maxTxnsInDay > 2) {
-      transaction_velocity = 8;
-    }
-  }
-
-  // --- Account Factors (max 20pts) ---
-  if (customer.pep_flag) {
-    account_factors += 10;
-    rules_triggered.push('PEP Flag');
-  }
-  if (customer.created_at) {
-    const accountAge = (Date.now() - new Date(customer.created_at).getTime()) / (1000 * 60 * 60 * 24);
-    const hasLargeTxn = transactions.some(t => parseFloat(t.amount) > 50000);
-    if (accountAge < 90 && hasLargeTxn) {
-      account_factors += 10;
-      rules_triggered.push('New Device High Value');
-    }
-  }
-  account_factors = Math.min(account_factors, 20);
-
-  const score = Math.min(country_risk + income_mismatch + transaction_velocity + account_factors, 100);
+  const score = Math.min(income_mismatch + crypto_risk + profile_risk, 100);
 
   let tier = 'LOW';
   if (score >= 66) tier = 'HIGH';
@@ -90,10 +55,9 @@ export function computeRiskScore(customer, transactions = []) {
     score,
     tier,
     breakdown: {
-      country_risk,
+      profile_risk,
+      crypto_risk,
       income_mismatch,
-      transaction_velocity,
-      account_factors,
     },
     rules_triggered: [...new Set(rules_triggered)],
   };
@@ -261,26 +225,91 @@ export async function fetchApiCountries() {
 }
 
 // ============================================================
+// Admin — User Management
+// ============================================================
+export async function fetchAdminUsers() {
+  return apiGet('/api/admin/users');
+}
+
+export async function adminCreateUser({ email, password, role }) {
+  return apiPost('/api/admin/users', { email, password, role });
+}
+
+export async function adminUpdateUserRole(userId, role) {
+  return apiPatch(`/api/admin/users/${userId}/role`, { role });
+}
+
+// ============================================================
 // AML Rule Generation (Added for Issue 2 & 3)
 // ============================================================
 
-export function applyAMLRules(transaction, activeRuleNames) {
-  if (activeRuleNames.has('Geographic Risk') && (transaction.country_risk_level === 'High' || transaction.country_risk_level === 'HIGH')) {
-    return { triggered: true, rule_name: 'Geographic Risk', severity: 'HIGH' };
+export function applyAMLRules(transaction, activeRuleNames, contextTxns = []) {
+  let score = 0;
+  let triggered_rules = [];
+
+  // 1. Geographic Risk (Blacklisted/Grey FATF - e.g. Iran) [Weight: 25]
+  const highRiskCountries = ['iran', 'north korea', 'myanmar', 'syria', 'yemen', 'mali'];
+  const isHighRiskCountry = highRiskCountries.includes((transaction.country || '').toLowerCase()) || 
+                            (transaction.country_risk_level || '').toLowerCase() === 'high';
+                            
+  if (activeRuleNames.has('Geographic Risk') && isHighRiskCountry) {
+    score += 25;
+    triggered_rules.push('Geographic Risk');
   }
-  if (activeRuleNames.has('Velocity Spike') && transaction.transaction_frequency_1hr > 5) {
-    return { triggered: true, rule_name: 'Velocity Spike', severity: 'HIGH' };
+
+  // 2. Clustering / Structuring Rule [Weight: 25]
+  if (activeRuleNames.has('Structuring')) {
+    const isStructuringAmount = (transaction.amount >= 9000 && transaction.amount <= 10000) || 
+                                (transaction.amount >= 100000 && transaction.amount <= 500000);
+                                
+    if (contextTxns.length > 0 && isStructuringAmount) {
+      const thirtyDaysAgo = new Date(transaction.transaction_date || Date.now());
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const recentTxns = contextTxns.filter(t => 
+        new Date(t.transaction_date) >= thirtyDaysAgo && 
+        new Date(t.transaction_date) <= new Date(transaction.transaction_date || Date.now()) &&
+        ((t.amount >= 9000 && t.amount <= 10000) || (t.amount >= 100000 && t.amount <= 500000))
+      );
+      
+      const sum = recentTxns.reduce((a, b) => a + parseFloat(b.amount || 0), 0) + parseFloat(transaction.amount);
+      if ((sum >= 50000 || sum >= 900000) && recentTxns.length >= 1) { // Current + 1 or more recent
+        score += 25;
+        triggered_rules.push('Clustering/Structuring');
+      }
+    } else if (isStructuringAmount) {
+        score += 10;
+        triggered_rules.push('Possible Structuring');
+    }
   }
-  if (activeRuleNames.has('Dormancy Activation') && transaction.days_since_last_transaction > 30) {
-    return { triggered: true, rule_name: 'Dormancy Activation', severity: 'MEDIUM' };
+
+  // 3. Layering [Weight: 20]
+  if (activeRuleNames.has('Layering') && transaction.path_length_hops >= 4 && transaction.degree_centrality > 0.5) {
+    score += 20;
+    triggered_rules.push('Layering');
   }
-  if (activeRuleNames.has('Structuring') && transaction.amount > 9000 && transaction.amount < 10000) {
-    return { triggered: true, rule_name: 'Structuring', severity: 'HIGH' };
+
+  // 4. Velocity Spike [Weight: 15]
+  let isVelSpike = false;
+  if (activeRuleNames.has('Velocity Spike') && transaction.transaction_frequency_1hr >= 5) {
+    score += 15;
+    triggered_rules.push('Velocity Spike');
+    isVelSpike = true;
+  } else if (activeRuleNames.has('Velocity Spike') && !isVelSpike && transaction.transaction_frequency_1hr >= (transaction.avg_frequency_1hr || 1) * 3) {
+    score += 15;
+    triggered_rules.push('Velocity Spike (3x Avg)');
   }
-  if (activeRuleNames.has('New Device') && transaction.is_new_device) {
-    return { triggered: true, rule_name: 'New Device', severity: 'MEDIUM' };
+
+  // 5. Dormancy Activation [Weight: 15]
+  if (activeRuleNames.has('Dormancy Activation') && transaction.days_since_last_transaction >= 30) {
+    score += 15;
+    triggered_rules.push('Dormancy Activation');
   }
-  return { triggered: false };
+
+  let severity = 'LOW';
+  if (score >= 45) severity = 'HIGH';
+  else if (score >= 20) severity = 'MEDIUM';
+
+  return { triggered: score > 0, rule_name: triggered_rules.join(', '), severity, score };
 }
 
 export async function generateAlertsFromTransactions(transactions) {
@@ -290,8 +319,16 @@ export async function generateAlertsFromTransactions(transactions) {
     const alertsToInsert = [];
     const flagUpdates = []; // Track which transactions to flag in the DB
 
+    // Group transactions by customer for clustering context
+    const txnsByCustomer = {};
     for (const txn of transactions) {
-      const ruleResult = applyAMLRules(txn, activeRuleNames);
+      if (!txnsByCustomer[txn.customer_id]) txnsByCustomer[txn.customer_id] = [];
+      txnsByCustomer[txn.customer_id].push(txn);
+    }
+
+    for (const txn of transactions) {
+      const contextTxns = txnsByCustomer[txn.customer_id] || [];
+      const ruleResult = applyAMLRules(txn, activeRuleNames, contextTxns);
       if (ruleResult.triggered) {
         alertsToInsert.push({
           alert_id: `ALT-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
@@ -309,6 +346,7 @@ export async function generateAlertsFromTransactions(transactions) {
           transaction_id: txn.transaction_id,
           flag_reason: ruleResult.rule_name,
           rule_triggered: ruleResult.rule_name,
+          risk_score: ruleResult.score
         });
       }
     }

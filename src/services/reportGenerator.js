@@ -49,7 +49,7 @@ function formatDate(d) {
 // Helper to fetch logo asynchronously
 async function getLogoBase64() {
   try {
-    const res = await fetch('/logo.png');
+    const res = await fetch('/logo.webp');
     if (!res.ok) return null;
     const blob = await res.blob();
     return new Promise((resolve) => {
@@ -77,7 +77,7 @@ function addHeader(doc, title, refNumber, settings, logoBase64) {
 
   if (logoBase64) {
     // Add Logo
-    doc.addImage(logoBase64, 'PNG', 15, 10, 25, 25);
+    doc.addImage(logoBase64, 'WEBP', 15, 10, 25, 25);
   } else {
     // Fallback shape if logo fetch fails
     doc.setFillColor(255, 255, 255);

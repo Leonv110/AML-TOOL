@@ -213,7 +213,7 @@ export default function TransactionMonitoring() {
                         {tx.transaction_date ? new Date(tx.transaction_date).toLocaleDateString() : 'N/A'}
                       </td>
                       <td style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 600 }}>
-                        ${parseFloat(tx.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        ₹{parseFloat(tx.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </td>
                       <td style={{ fontSize: '0.75rem' }}>{tx.transaction_type || 'N/A'}</td>
                       <td>{tx.country || 'N/A'}</td>
@@ -225,7 +225,10 @@ export default function TransactionMonitoring() {
                         ) : <span style={{ color: 'var(--text-muted)' }}>N/A</span>}
                       </td>
                       <td style={{ fontSize: '0.75rem', color: tx.rule_triggered ? '#f59e0b' : 'var(--text-muted)' }}>
-                        {tx.rule_triggered || 'None'}
+                        <div>{tx.rule_triggered || 'None'}</div>
+                        {tx.risk_score && tx.rule_triggered ? (
+                           <div style={{ fontSize: '0.6rem', color: '#6b7280', marginTop: '2px' }}>Score: {tx.risk_score}/100</div>
+                        ) : null}
                       </td>
                       <td>
                         {tx.flagged ? (

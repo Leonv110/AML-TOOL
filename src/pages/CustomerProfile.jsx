@@ -162,7 +162,7 @@ export default function CustomerProfile() {
           <div className="info-row">
             <span className="info-label">Income</span>
             <span className="info-value">
-              {customer.income ? `$${parseFloat(customer.income).toLocaleString()}` : 'N/A'}
+              {customer.income ? `₹${parseFloat(customer.income).toLocaleString('en-IN')}` : 'N/A'}
             </span>
           </div>
           <div className="info-row">
@@ -188,20 +188,16 @@ export default function CustomerProfile() {
               </div>
               <div className="score-breakdown">
                 <div className="score-breakdown-item">
-                  <span className="label">Country Risk</span>
-                  <span className="value">{risk.breakdown.country_risk}/30</span>
+                  <span className="label">Profile Risk (PEP/HNI)</span>
+                  <span className="value">{risk.breakdown.profile_risk || 0}/80</span>
+                </div>
+                <div className="score-breakdown-item">
+                  <span className="label">Crypto Dealings</span>
+                  <span className="value">{risk.breakdown.crypto_risk || 0}/50</span>
                 </div>
                 <div className="score-breakdown-item">
                   <span className="label">Income Mismatch</span>
-                  <span className="value">{risk.breakdown.income_mismatch}/25</span>
-                </div>
-                <div className="score-breakdown-item">
-                  <span className="label">Transaction Velocity</span>
-                  <span className="value">{risk.breakdown.transaction_velocity}/25</span>
-                </div>
-                <div className="score-breakdown-item">
-                  <span className="label">Account Factors</span>
-                  <span className="value">{risk.breakdown.account_factors}/20</span>
+                  <span className="value">{risk.breakdown.income_mismatch || 0}/50</span>
                 </div>
               </div>
             </>
@@ -309,7 +305,7 @@ export default function CustomerProfile() {
                       {tx.transaction_date ? new Date(tx.transaction_date).toLocaleDateString() : 'N/A'}
                     </td>
                     <td style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 600 }}>
-                      ${parseFloat(tx.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      ₹{parseFloat(tx.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </td>
                     <td style={{ fontSize: '0.75rem' }}>{tx.transaction_type || 'N/A'}</td>
                     <td>{tx.country || 'N/A'}</td>

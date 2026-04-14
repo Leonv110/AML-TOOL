@@ -9,7 +9,7 @@ import './IngestionPage.css';
 
 export default function IngestionPage() {
     const navigate = useNavigate();
-    const { user } = useAuth();
+    const { user, userRole } = useAuth();
     const [mode, setMode] = useState('append'); // 'append' or 'replace'
     const [file, setFile] = useState(null);
     const [uploadComplete, setUploadComplete] = useState(false);
@@ -317,15 +317,9 @@ export default function IngestionPage() {
             const alertsCreated = await generateAlertsFromTransactions(transactions);
             setAmlProgress(80);
 
-            // Step 3: Count flagged transactions
-            setAmlProgressMsg("Counting flagged transactions...");
-            const flaggedTxns = transactions.filter(t =>
-                t.country_risk_level?.toLowerCase() === 'high' ||
-                t.transaction_frequency_1hr > 5 ||
-                t.days_since_last_transaction > 30 ||
-                (t.amount > 9000 && t.amount < 10000) ||
-                t.is_new_device === true
-            ).length;
+            // Step 3: Align counts
+            setAmlProgressMsg("Finalizing results...");
+            const flaggedTxns = alertsCreated; // Sync flagged count with actual alerts generated
 
             setAmlProgress(100);
             const duration = (Date.now() - startTime) / 1000;
@@ -360,6 +354,16 @@ export default function IngestionPage() {
             </header>
 
             <div className="ingestion-card">
+                {userRole === 'student' ? (
+                    <div className="student-restriction" style={{ textAlign: 'center', padding: '2rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #ef4444', borderRadius: '12px' }}>
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" style={{ margin: '0 auto 1rem' }}>
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                        </svg>
+                        <h2 style={{ color: '#ef4444', marginBottom: '0.5rem' }}>Upload Restricted</h2>
+                        <p style={{ color: 'var(--text-muted)' }}>As a student, you only have access to synthetic datasets provided by the instructors. Data ingestion is restricted.</p>
+                    </div>
+                ) : (
+                    <>
                 <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', background: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: '12px' }}>
                     <div style={{ flex: 1 }}>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 600, paddingLeft: '0.5rem' }}>Data Type</div>
@@ -544,6 +548,8 @@ export default function IngestionPage() {
                         )}
                     </button>
                 </div>
+                </>
+                )}
             </div>
 
             {uploadComplete && (

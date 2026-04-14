@@ -6,10 +6,14 @@ import { apiPost } from '../apiClient';
 
 // Static dataset of ~20 known AML-relevant names for local matching
 const SANCTIONS_LIST = [
+  // Client Request Real Cases
+  { name: 'Narendra Modi', country: 'India', pep_category: 'Prime Minister', sources: ['PEP Database'] },
+  { name: 'Donald Trump', country: 'USA', pep_category: 'Former President', sources: ['PEP Database', 'Adverse Media'] },
+  { name: 'Amitabh Bachchan', country: 'India', pep_category: null, sources: ['Adverse Media (Panama Papers)'] },
+  
+  // Existing Data
   { name: 'Mohammed Al-Rashid', country: 'Nigeria', pep_category: 'Government Official', sources: ['OFAC', 'UN Sanctions', 'PEP Database'] },
   { name: 'Amira Hassan', country: 'Nigeria', pep_category: null, sources: ['OFAC', 'EU List'] },
-  { name: 'Viktor Bout', country: 'Russia', pep_category: null, sources: ['OFAC', 'UN Sanctions'] },
-  { name: 'Dawood Ibrahim', country: 'India', pep_category: null, sources: ['OFAC', 'UN Sanctions', 'EU List'] },
   { name: 'Semion Mogilevich', country: 'Russia', pep_category: null, sources: ['OFAC', 'EU List'] },
   { name: 'Joaquin Guzman', country: 'Mexico', pep_category: null, sources: ['OFAC', 'UN Sanctions'] },
   { name: 'Abdul Qadeer Khan', country: 'Pakistan', pep_category: 'Nuclear Scientist', sources: ['UN Sanctions', 'EU List'] },

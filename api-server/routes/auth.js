@@ -22,6 +22,13 @@ router.post('/signup', async (req, res) => {
       client.release();
       return res.status(400).json({ error: 'Email and password are required' });
     }
+
+    // Disable open signup as requested
+    client.release();
+    return res.status(403).json({ error: 'Signup is currently restricted. Please contact your administrator.' });
+
+    // The rest of the function will be blocked
+    /*
     if (password.length < 6) {
       client.release();
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
@@ -63,7 +70,7 @@ router.post('/signup', async (req, res) => {
       user: { id: user.id, email: user.email, created_at: user.created_at },
       role,
       token,
-    });
+    */
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
     client.release();
