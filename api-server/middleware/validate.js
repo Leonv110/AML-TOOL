@@ -76,7 +76,15 @@ const schemas = {
   // --- Admin ---
   adminCreateUser: Joi.object({
     email: Joi.string().email().required(),
-    password: Joi.string().min(6).required(),
+    password: Joi.string().min(8)
+      .pattern(/[A-Z]/, 'uppercase letter')
+      .pattern(/[a-z]/, 'lowercase letter')
+      .pattern(/[0-9]/, 'number')
+      .required()
+      .messages({
+        'string.min': 'Password must be at least 8 characters',
+        'string.pattern.name': 'Password must contain at least one {#name}',
+      }),
     role: Joi.string().valid('student', 'investigator', 'admin', 'exam').default('student'),
   }),
 

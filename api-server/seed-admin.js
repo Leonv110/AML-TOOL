@@ -6,8 +6,19 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejec
 
 async function seedAdmin() {
   try {
-    const email = process.env.ADMIN_EMAIL || 'admin@gafa.org';
-    const password = process.env.ADMIN_PASSWORD || 'admin123';
+    const email = process.env.ADMIN_EMAIL;
+    const password = process.env.ADMIN_PASSWORD;
+
+    if (!email || !password) {
+      console.error('❌ ADMIN_EMAIL and ADMIN_PASSWORD must be set in .env');
+      process.exit(1);
+    }
+
+    // Enforce password strength
+    if (password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
+      console.error('❌ Admin password must be at least 8 characters with uppercase, lowercase, and a number');
+      process.exit(1);
+    }
     const existing = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
     if (existing.rows.length === 0) {
       const salt = await bcrypt.genSalt(10);
