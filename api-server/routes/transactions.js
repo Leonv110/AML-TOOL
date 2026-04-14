@@ -48,11 +48,19 @@ router.get('/', authenticateToken, async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit) || 500, 50000);
     const offset = ((parseInt(page) || 1) - 1) * limit;
     const userId = req.user.id;
+    const isAdmin = req.user.role === 'admin';
 
-    // Filter by uploaded_by = current user (data isolation)
-    let query = 'SELECT * FROM transactions WHERE (uploaded_by = $1 OR uploaded_by IS NULL)';
-    const params = [userId];
-    let idx = 2;
+    // Admins see all data; other roles see only their own uploads
+    let query, params, idx;
+    if (isAdmin) {
+      query = 'SELECT * FROM transactions WHERE 1=1';
+      params = [];
+      idx = 1;
+    } else {
+      query = 'SELECT * FROM transactions WHERE (uploaded_by = $1 OR uploaded_by IS NULL)';
+      params = [userId];
+      idx = 2;
+    }
 
     if (startDate) { query += ` AND transaction_date >= $${idx++}`; params.push(startDate); }
     if (endDate) { query += ` AND transaction_date <= $${idx++}`; params.push(endDate); }
@@ -69,6 +77,35 @@ router.get('/', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('Fetch transactions error:', err);
     res.status(500).json({ error: 'Failed to fetch transactions' });
+  }
+});
+
+/**
+ * @swagger
+ * /transactions/count:
+ *   get:
+ *     summary: Get total count of transactions for current user/admin
+ *     tags: [Transactions]
+ *     responses:
+ *       200:
+ *         description: Transaction count
+ */
+router.get('/count', authenticateToken, async (req, res) => {
+  try {
+    const isAdmin = req.user.role === 'admin';
+    let query, params;
+    if (isAdmin) {
+      query = 'SELECT COUNT(*) FROM transactions';
+      params = [];
+    } else {
+      query = 'SELECT COUNT(*) FROM transactions WHERE (uploaded_by = $1 OR uploaded_by IS NULL)';
+      params = [req.user.id];
+    }
+    const { rows } = await pool.query(query, params);
+    res.json({ count: parseInt(rows[0].count) });
+  } catch (err) {
+    console.error('Count transactions error:', err);
+    res.status(500).json({ error: 'Failed to count transactions' });
   }
 });
 
@@ -127,18 +164,24 @@ router.patch('/flag', authenticateToken, async (req, res) => {
       const idPlaceholders = ids.map(() => `$${pIdx++}`);
       params.push(...ids);
 
-      // Only update user's own transactions
-      params.push(req.user.id);
-      const userFilter = `$${pIdx++}`;
+      const isAdmin = req.user.role === 'admin';
+      let whereClause;
+      if (isAdmin) {
+        whereClause = `WHERE transaction_id IN (${idPlaceholders.join(', ')})`;
+      } else {
+        params.push(req.user.id);
+        const userFilter = `$${pIdx++}`;
+        whereClause = `WHERE transaction_id IN (${idPlaceholders.join(', ')})
+          AND (uploaded_by = ${userFilter} OR uploaded_by IS NULL)`;
+      }
 
       const query = `
         UPDATE transactions SET
           flagged = TRUE,
           flag_reason = CASE ${flagReasonCases} END,
           rule_triggered = CASE ${ruleTriggeredCases} END,
-          risk_score = CASE ${riskScoreCases} END
-        WHERE transaction_id IN (${idPlaceholders.join(', ')})
-          AND (uploaded_by = ${userFilter} OR uploaded_by IS NULL)
+          risk_score = CAST(CASE ${riskScoreCases} END AS NUMERIC)
+        ${whereClause}
       `;
 
       const result = await pool.query(query, params);
@@ -149,6 +192,38 @@ router.patch('/flag', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('Flag transactions error:', err);
     res.status(500).json({ error: 'Failed to flag transactions: ' + err.message });
+  }
+});
+
+/**
+ * @swagger
+ * /transactions/reset-flags:
+ *   post:
+ *     summary: Clear all flags and risk scores (for re-processing)
+ *     tags: [Transactions]
+ *     responses:
+ *       200:
+ *         description: Number of transactions reset
+ */
+router.post('/reset-flags', authenticateToken, async (req, res) => {
+  try {
+    const isAdmin = req.user.role === 'admin';
+    let query;
+    let params = [];
+
+    if (isAdmin) {
+      query = 'UPDATE transactions SET flagged = null, flag_reason = null, rule_triggered = null, risk_score = null';
+    } else {
+      query = 'UPDATE transactions SET flagged = null, flag_reason = null, rule_triggered = null, risk_score = null WHERE (uploaded_by = $1 OR uploaded_by IS NULL)';
+      params = [req.user.id];
+    }
+
+    const result = await pool.query(query, params);
+    console.log(`[Reset] Cleared flags on ${result.rowCount} transactions (user: ${req.user.email})`);
+    res.json({ reset: result.rowCount });
+  } catch (err) {
+    console.error('Reset flags error:', err);
+    res.status(500).json({ error: 'Failed to reset flags' });
   }
 });
 

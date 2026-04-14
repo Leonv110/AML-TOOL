@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { screenCustomerManual } from '../services/screeningService';
 import { fetchApiCountries } from '../services/dataService';
 import './pages.css';
@@ -7,20 +8,24 @@ const ENTITY_TYPES = ['Person', 'Company', 'Organization', 'Crypto_Wallet', 'Ves
 const CATEGORIES = ['Sanctions', 'PEP', 'PEP Level 1', 'PEP Level 2', 'PEP Level 3', 'PEP Level 4', 'RCA', 'Adverse Media', 'SIP', 'SIE', 'Fitness and Probity', 'Insolvency', 'Warnings and Regulatory Enforcement', 'Law Enforcement', 'Businessperson', 'State Owned Enterprise'];
 
 export default function Screening() {
+  const location = useLocation();
+  const incomingPerson = location.state?.person;
+
   const [viewMode, setViewMode] = useState('form'); // 'form' or 'results'
   
   const [countriesList, setCountriesList] = useState([]);
   const [countrySearch, setCountrySearch] = useState('');
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
   
-  const [name, setName] = useState('');
-  const [entityType, setEntityType] = useState(['Person']);
-  const [categories, setCategories] = useState(['PEP Level 1']);
+  const [name, setName] = useState(incomingPerson?.name || '');
+  const [entityType, setEntityType] = useState(incomingPerson ? [incomingPerson.entity_type] : ['Person']);
+  const [categories, setCategories] = useState(incomingPerson ? incomingPerson.category.split(',').map(c=>c.trim()) : ['PEP Level 1']);
   const [countries, setCountries] = useState([]); // array of country codes
   
-  const [dobDay, setDobDay] = useState('');
-  const [dobMonth, setDobMonth] = useState('');
-  const [dobYear, setDobYear] = useState('');
+  const initialDob = incomingPerson?.dob ? incomingPerson.dob.split('-') : [];
+  const [dobDay, setDobDay] = useState(initialDob[0] || '');
+  const [dobMonth, setDobMonth] = useState(initialDob[1] || '');
+  const [dobYear, setDobYear] = useState(initialDob[2] || '');
   const [uniqueId, setUniqueId] = useState('');
   const [matchScore, setMatchScore] = useState(80);
   const [exactSearch, setExactSearch] = useState(false);

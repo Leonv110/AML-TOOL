@@ -20,6 +20,20 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
+// GET /api/customers/count — count current user's customers
+router.get('/count', authenticateToken, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT COUNT(*) FROM customers WHERE (uploaded_by = $1 OR uploaded_by IS NULL)',
+      [req.user.id]
+    );
+    res.json({ count: parseInt(rows[0].count) });
+  } catch (err) {
+    console.error('Count customers error:', err);
+    res.status(500).json({ error: 'Failed to count customers' });
+  }
+});
+
 // GET /api/customers/countries — distinct countries for current user
 router.get('/countries', authenticateToken, async (req, res) => {
   try {
@@ -133,12 +147,13 @@ router.post('/:customerId/screen', authenticateToken, async (req, res) => {
 // Per-user rate limiting: max 10 screening requests per user per hour
 const rateLimit = require('express-rate-limit');
 const screeningLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
+  windowMs: 60 * 60 * 1000,
   max: 10,
-  keyGenerator: (req) => req.user?.id || req.ip, // per-user, not per-IP
+  keyGenerator: (req) => req.user?.id || 'anonymous',
   message: { error: 'Screening limit reached (10/hour). Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
+  validate: false,
 });
 router.post('/manual-screen', authenticateToken, screeningLimiter, async (req, res) => {
   try {

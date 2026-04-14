@@ -1,11 +1,32 @@
-import { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiPost, apiDelete, apiPut, apiGet } from '../apiClient';
 import { useAuth } from '../contexts/AuthContext';
 import { generateAlertsFromTransactions } from '../services/dataService';
+import { screenCustomerManual } from '../services/screeningService';
 import { logEvent } from '../services/auditService';
 import * as XLSX from 'xlsx';
 import './IngestionPage.css';
+
+// ── Pre-loaded REAL names for Screening (not synthetic) ──
+const SCREENING_NAMES = [
+  { id: 'SCR-001', name: 'Narendra Modi', dob: '17-09-1950', country: 'India', entity_type: 'Person', category: 'PEP Level 1', description: 'Prime Minister of India' },
+  { id: 'SCR-002', name: 'Donald Trump', dob: '14-06-1946', country: 'United States', entity_type: 'Person', category: 'PEP Level 1', description: 'Former President of USA' },
+  { id: 'SCR-003', name: 'Amitabh Bachchan', dob: '11-10-1942', country: 'India', entity_type: 'Person', category: 'Adverse Media', description: 'Actor - Panama Papers mention' },
+  { id: 'SCR-004', name: 'Vladimir Putin', dob: '07-10-1952', country: 'Russia', entity_type: 'Person', category: 'Sanctions', description: 'President of Russia' },
+  { id: 'SCR-005', name: 'Kim Jong Un', dob: '08-01-1984', country: 'North Korea', entity_type: 'Person', category: 'Sanctions', description: 'Supreme Leader of DPRK' },
+  { id: 'SCR-006', name: 'Masood Azhar', dob: '10-07-1968', country: 'Pakistan', entity_type: 'Person', category: 'Sanctions', description: 'UN-listed designated terrorist' },
+  { id: 'SCR-007', name: 'Nawaz Sharif', dob: '25-12-1949', country: 'Pakistan', entity_type: 'Person', category: 'PEP Level 1', description: 'Former PM of Pakistan - Panama Papers' },
+  { id: 'SCR-008', name: 'Sani Abacha', dob: '20-09-1943', country: 'Nigeria', entity_type: 'Person', category: 'PEP Level 1', description: 'Former Head of State - Nigeria' },
+  { id: 'SCR-009', name: 'Semion Mogilevich', dob: '30-06-1946', country: 'Russia', entity_type: 'Person', category: 'Sanctions', description: 'FBI Most Wanted - Organized Crime' },
+  { id: 'SCR-010', name: 'Diezani Alison-Madueke', dob: '06-12-1960', country: 'Nigeria', entity_type: 'Person', category: 'PEP Level 1', description: 'Former Minister - Money Laundering charges' },
+  { id: 'SCR-011', name: 'Dawood Ibrahim', dob: '26-12-1955', country: 'India', entity_type: 'Person', category: 'Sanctions', description: 'UN-designated terrorist / organized crime' },
+  { id: 'SCR-012', name: 'Bashar Al Assad', dob: '11-09-1965', country: 'Syria', entity_type: 'Person', category: 'Sanctions', description: 'Former President of Syria' },
+  { id: 'SCR-013', name: 'Nirav Modi', dob: '27-05-1971', country: 'India', entity_type: 'Person', category: 'Adverse Media', description: 'PNB Bank Fraud - Interpol Red Notice' },
+  { id: 'SCR-014', name: 'Hezbollah', dob: '', country: 'Lebanon', entity_type: 'Organization', category: 'Sanctions', description: 'Designated terrorist organization' },
+  { id: 'SCR-015', name: 'Gautam Adani', dob: '24-06-1962', country: 'India', entity_type: 'Person', category: 'Adverse Media', description: 'Adani Group - Hindenburg Research' },
+];
+
 
 export default function IngestionPage() {
     const navigate = useNavigate();
@@ -26,7 +47,26 @@ export default function IngestionPage() {
     const fileInputRef = useRef(null);
     const [parsedFullData, setParsedFullData] = useState(null); // Store parsed data for export
 
-    const [dataType, setDataType] = useState('transactions'); // 'transactions' or 'customers'
+    const [dataType, setDataType] = useState('transactions'); // 'transactions', 'customers', or 'screening'
+    const [existingCount, setExistingCount] = useState(0);
+
+    // Dynamic data count check
+    useEffect(() => {
+        if (!user) return;
+        const fetchCount = async () => {
+            try {
+                if (dataType === 'screening') return;
+                const endpoint = dataType === 'transactions' ? '/api/transactions/count' : '/api/customers/count';
+                const { count } = await apiGet(endpoint);
+                setExistingCount(count || 0);
+            } catch (e) {
+                console.warn('Silent data count failure:', e);
+            }
+        };
+        fetchCount();
+        setAmlResult(null); // Clear previous results when tab changes
+        setAmlError(null);
+    }, [user, dataType, uploadComplete]);
 
     const parseExcel = (file) => {
         return new Promise((resolve, reject) => {
@@ -301,7 +341,7 @@ export default function IngestionPage() {
 
             // Step 1: Fetch only UNFLAGGED transactions to process
             setAmlProgress(10);
-            const allTxns = await apiGet(`/api/transactions?limit=50000`);
+            const allTxns = await apiGet(`/api/transactions?limit=50000&_t=${Date.now()}`);
             
             if (!allTxns || !Array.isArray(allTxns)) {
                 setAmlError("Failed to fetch transactions. Please re-login and try again.");
@@ -403,8 +443,20 @@ export default function IngestionPage() {
                                 </svg>
                                 Customer Master Data
                             </button>
+                            <button
+                                className={`option-btn ${dataType === 'screening' ? 'active' : ''}`}
+                                onClick={() => setDataType('screening')}
+                                style={dataType === 'screening' ? { background: '#10b981' } : {}}
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.5rem' }}>
+                                    <circle cx="11" cy="11" r="8" />
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                </svg>
+                                Screening Data
+                            </button>
                         </div>
                     </div>
+                    {dataType !== 'screening' && (
                     <div style={{ flex: 1 }}>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 600, paddingLeft: '0.5rem' }}>Write Mode</div>
                         <div className="upload-options" style={{ margin: 0 }}>
@@ -422,9 +474,11 @@ export default function IngestionPage() {
                             </button>
                         </div>
                     </div>
+                    )}
                 </div>
 
-                {!file ? (
+
+                {dataType !== 'screening' && (!file ? (
                     <div
                         className="upload-area"
                         onDragOver={handleDragOver}
@@ -472,10 +526,10 @@ export default function IngestionPage() {
                             </button>
                         )}
                     </div>
-                )}
+                ))}
 
                 {/* Column Preview — shows after file selection, before upload */}
-                {preview && !uploading && (
+                {dataType !== 'screening' && preview && !uploading && (
                     <div className="preview-section">
                         <div className="preview-header">
                             <h3>
@@ -511,7 +565,7 @@ export default function IngestionPage() {
                     </div>
                 )}
 
-                {uploading && (
+                {dataType !== 'screening' && uploading && (
                     <div className="progress-container">
                         <div className="progress-bar-bg">
                             <div
@@ -526,7 +580,7 @@ export default function IngestionPage() {
                     </div>
                 )}
 
-                {status && (
+                {dataType !== 'screening' && status && (
                     <div className={`status-message ${status.type}`}>
                         {status.type === 'success' ? (
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -549,6 +603,7 @@ export default function IngestionPage() {
                     </div>
                 )}
 
+                {dataType !== 'screening' && (
                 <div className="upload-actions">
                     <button
                         className="upload-btn"
@@ -564,37 +619,136 @@ export default function IngestionPage() {
                         )}
                     </button>
                 </div>
+                )}
                 </>
                 )}
             </div>
 
-            {uploadComplete && (
-              <div className="aml-processing-section">
+            {/* ── SCREENING DATA TAB ── */}
+            {dataType === 'screening' && (
+              <div className="ingestion-card" style={{ marginTop: '1.5rem' }}>
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <h3 style={{ margin: '0 0 0.5rem', fontSize: '1.1rem', fontWeight: 700 }}>🔍 Pre-loaded Screening Subjects</h3>
+                  <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: 0 }}>
+                    Real-world names loaded for AML Watcher screening. Click "Screen" on any subject to verify against global watchlists, sanctions, PEP databases, and adverse media.
+                  </p>
+                </div>
+
+                <div className="preview-table-wrapper" style={{ maxHeight: '600px' }}>
+                  <table className="preview-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '30px' }}>#</th>
+                        <th>Name</th>
+                        <th>Country</th>
+                        <th>DOB</th>
+                        <th>Type</th>
+                        <th>Expected Category</th>
+                        <th style={{ width: '130px', textAlign: 'center' }}>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {SCREENING_NAMES.map((person, idx) => {
+                        return (
+                          <Fragment key={person.id}>
+                            <tr>
+                              <td style={{ color: '#64748b' }}>{idx + 1}</td>
+                              <td style={{ fontWeight: 600, color: '#f1f5f9' }}>{person.name}</td>
+                              <td>{person.country}</td>
+                              <td style={{ fontSize: '0.8rem' }}>{person.dob || '—'}</td>
+                              <td>
+                                <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '4px', background: person.entity_type === 'Organization' ? 'rgba(59,130,246,0.15)' : 'rgba(139,92,246,0.15)', color: person.entity_type === 'Organization' ? '#60a5fa' : '#a78bfa' }}>
+                                  {person.entity_type}
+                                </span>
+                              </td>
+                              <td>
+                                <span style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '4px',
+                                  background: person.category.includes('Sanctions') ? 'rgba(239,68,68,0.15)' : person.category.includes('PEP') ? 'rgba(245,158,11,0.15)' : 'rgba(59,130,246,0.15)',
+                                  color: person.category.includes('Sanctions') ? '#f87171' : person.category.includes('PEP') ? '#fbbf24' : '#60a5fa'
+                                }}>{person.category}</span>
+                              </td>
+                              <td style={{ textAlign: 'center' }}>
+                                  <button
+                                    onClick={() => navigate('/screening', { state: { person } })}
+                                    style={{ padding: '4px 12px', fontSize: '0.75rem', background: '#10b981', color: '#050709', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 700 }}
+                                  >
+                                    🔍 Screen Deep Dive
+                                  </button>
+                                </td>
+                              </tr>
+                          </Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.15)', borderRadius: '8px', fontSize: '0.8rem', color: '#94a3b8' }}>
+                  ⚡ <strong style={{ color: '#10b981' }}>Note:</strong> Each screening call hits the live AML Watcher API. API calls are rate-limited to protect your organization's quota.
+                </div>
+              </div>
+            )}
+
+            {dataType !== 'screening' && (uploadComplete || existingCount > 0) && (
+              <div className="aml-processing-section" style={{ borderTop: `2px solid ${dataType === 'customers' ? '#3b82f6' : '#f59e0b'}` }}>
                 <div className="aml-processing-header">
-                  <h3>Step 2 — Run AML Processing</h3>
+                  <h3>{uploadComplete ? `Step 2 — Run ${dataType === 'customers' ? 'Screening' : 'AML Processing'}` : `${dataType === 'customers' ? 'Customer Screening' : 'AML Processing'}`}</h3>
                   <p>
-                    Data uploaded successfully. Click below to run the AML rule engine — 
-                    this will flag suspicious transactions, compute risk scores, and generate alerts.
+                    {uploadComplete 
+                      ? `Data successfully ingested. Proceed to ${dataType === 'customers' ? 'AI-powered screening' : 'the rule engine'} to ${dataType === 'customers' ? 'verify names against global watchlists' : 'flag suspicious transactions'}.`
+                      : `${existingCount.toLocaleString()} ${dataType} found in database. Run or re-run analysis with current configurations.`
+                    }
                   </p>
                 </div>
 
                 {!amlResult && !amlError && (
-                  <button
-                    onClick={handleRunAMLProcessing}
-                    disabled={amlProcessing}
-                    className="aml-run-button"
-                  >
-                    {amlProcessing ? (
-                      <>
-                        <span className="spinner" />
-                        Running AML Processing...
-                      </>
-                    ) : (
-                      <>
-                        ⚡ Run AML Processing
-                      </>
+                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={handleRunAMLProcessing}
+                      disabled={amlProcessing}
+                      className="aml-run-button"
+                      style={{ background: dataType === 'customers' ? '#3b82f6' : '#f59e0b', color: dataType === 'customers' ? 'white' : '#050709' }}
+                    >
+                      {amlProcessing ? (
+                        <>
+                          <span className="spinner" style={{ borderTopColor: dataType === 'customers' ? 'white' : '#050709' }} />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          {dataType === 'customers' ? '🔍 Run Screening' : '⚡ Run AML Processing'}
+                        </>
+                      )}
+                    </button>
+                    {!uploadComplete && existingCount > 0 && (
+                      <button
+                        onClick={async () => {
+                          setAmlProcessing(true);
+                          setAmlProgressMsg('Clearing previous results...');
+                          setAmlProgress(5);
+                          try {
+                            if (dataType === 'transactions') {
+                                await apiPost('/api/transactions/reset-flags', {});
+                                await apiDelete('/api/alerts');
+                            } else {
+                                // For customers, we might clear screening history if applicable
+                                // Right now cascades are handled by DELETE /api/customers
+                            }
+                            setAmlProcessing(false);
+                            handleRunAMLProcessing();
+                          } catch (e) {
+                            setAmlError('Failed to reset: ' + e.message);
+                            setAmlProcessing(false);
+                          }
+                        }}
+                        disabled={amlProcessing}
+                        className="aml-run-button"
+                        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8' }}
+                      >
+                        🔄 Reset & Re-run
+                      </button>
                     )}
-                  </button>
+                  </div>
                 )}
 
                 {amlProcessing && (
@@ -646,6 +800,14 @@ export default function IngestionPage() {
                     <p style={{ fontSize: '12px', color: '#94a3b8', marginTop: '12px' }}>
                       {amlResult.message || 'View results in Alert Review and Transaction Monitoring'}
                     </p>
+                    {amlResult.processed > 0 && (
+                      <button
+                        onClick={() => { setAmlResult(null); setAmlError(null); }}
+                        style={{ marginTop: '12px', padding: '8px 16px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#94a3b8', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}
+                      >
+                        🔄 Run Again
+                      </button>
+                    )}
                   </div>
                 )}
 

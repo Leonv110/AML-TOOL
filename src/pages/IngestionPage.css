@@ -286,11 +286,11 @@
 }
 
 .aml-processing-section {
-  background: #0d1117;
-  border: 1px solid #1e293b;
-  border-top: 2px solid #f59e0b;
-  padding: 24px;
-  margin-top: 16px;
+  background: #1e293b;
+  border-radius: 1rem;
+  padding: 2rem;
+  border: 1px solid #334155;
+  margin-top: 1.5rem;
 }
 
 .aml-processing-header h3 {

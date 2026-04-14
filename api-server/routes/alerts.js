@@ -28,9 +28,18 @@ router.get('/', authenticateToken, async (req, res) => {
   try {
     const { status } = req.query;
     const userId = req.user.id;
-    let query = 'SELECT * FROM alerts WHERE (uploaded_by = $1 OR uploaded_by IS NULL)';
-    const params = [userId];
-    let idx = 2;
+    const isAdmin = req.user.role === 'admin';
+
+    let query, params, idx;
+    if (isAdmin) {
+      query = 'SELECT * FROM alerts WHERE 1=1';
+      params = [];
+      idx = 1;
+    } else {
+      query = 'SELECT * FROM alerts WHERE (uploaded_by = $1 OR uploaded_by IS NULL)';
+      params = [userId];
+      idx = 2;
+    }
 
     if (status && status !== 'all') {
       query += ` AND status = $${idx++}`;
@@ -197,20 +206,62 @@ router.post('/', authenticateToken, async (req, res) => {
 
     let inserted = 0;
 
-    for (const a of alerts) {
+    // Bulk insert in batches of 100 (11 params each = 1100 params/batch, well under PG limit)
+    const BATCH = 100;
+    for (let i = 0; i < alerts.length; i += BATCH) {
+      const batch = alerts.slice(i, i + BATCH);
+      const rows = [];
+      const vals = [];
+      let pIdx = 1;
+      for (const a of batch) {
+        rows.push(`($${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++}, $${pIdx++})`);
+        vals.push(a.alert_id, a.customer_id, a.customer_name, a.risk_level, a.rule_triggered, a.status || 'open', a.transaction_id, a.amount, a.country, a.created_at || new Date().toISOString(), userId);
+      }
       await pool.query(
         `INSERT INTO alerts (alert_id, customer_id, customer_name, risk_level, rule_triggered, status, transaction_id, amount, country, created_at, uploaded_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+         VALUES ${rows.join(', ')}
          ON CONFLICT (alert_id) DO NOTHING`,
-        [a.alert_id, a.customer_id, a.customer_name, a.risk_level, a.rule_triggered, a.status || 'open', a.transaction_id, a.amount, a.country, a.created_at || new Date().toISOString(), userId]
+        vals
       );
-      inserted++;
+      inserted += batch.length;
     }
 
     res.json({ inserted });
   } catch (err) {
     console.error('Insert alerts error:', err);
     res.status(500).json({ error: 'Failed to insert alerts: ' + err.message });
+  }
+});
+
+/**
+ * @swagger
+ * /alerts:
+ *   delete:
+ *     summary: Delete all alerts (for re-processing)
+ *     tags: [Alerts]
+ *     responses:
+ *       200:
+ *         description: Number of alerts deleted
+ */
+router.delete('/', authenticateToken, async (req, res) => {
+  try {
+    const isAdmin = req.user.role === 'admin';
+    let query, params;
+
+    if (isAdmin) {
+      query = 'DELETE FROM alerts';
+      params = [];
+    } else {
+      query = 'DELETE FROM alerts WHERE (uploaded_by = $1 OR uploaded_by IS NULL)';
+      params = [req.user.id];
+    }
+
+    const result = await pool.query(query, params);
+    console.log(`[Reset] Deleted ${result.rowCount} alerts (user: ${req.user.email})`);
+    res.json({ deleted: result.rowCount });
+  } catch (err) {
+    console.error('Delete alerts error:', err);
+    res.status(500).json({ error: 'Failed to delete alerts' });
   }
 });
 
