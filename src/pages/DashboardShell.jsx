@@ -1,8 +1,9 @@
 import { useNavigate, useLocation, Outlet, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useStudentRestrictions } from '../hooks/useStudentRestrictions';
 import { 
   Shield, LayoutDashboard, Users, UserCheck, Activity, 
-  AlertCircle, Briefcase, FileText, Upload, History, LogOut, Settings
+  AlertCircle, Briefcase, FileText, Upload, History, LogOut, Settings, Home
 } from 'lucide-react';
 import './DashboardShell.css';
 
@@ -14,13 +15,14 @@ const NAV_ITEMS = [
   { path: '/alerts', label: 'Alerts', icon: <AlertCircle size={18} /> },
   { path: '/investigations', label: 'Investigations', icon: <Briefcase size={18} /> },
   { path: '/reports', label: 'Reports', icon: <FileText size={18} /> },
-  { path: '/ingestion', label: 'Ingestion', icon: <Upload size={18} /> },
+  { path: '/ingestion', label: 'Ingestion', icon: <Upload size={18} />, requiredRoles: ['admin', 'investigator'] },
 ];
 
 export default function DashboardShell() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, userRole, logout } = useAuth();
+  useStudentRestrictions(); // Applies copy/context-menu restrictions for student/exam
 
   const isActive = (path) => location.pathname === path;
 
@@ -30,16 +32,18 @@ export default function DashboardShell() {
       
       {/* Sidebar navigation */}
       <aside className="dash-sidebar glass-panel">
-        <div className="sidebar-brand">
+        <Link to="/hub" className="sidebar-brand" style={{ textDecoration: 'none', cursor: 'pointer' }}>
           <img src="/logo.webp" alt="GAFA Logo" style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
           <div className="brand-text">
             <h2>GAFA</h2>
             <span>AML Tool</span>
           </div>
-        </div>
+        </Link>
 
         <nav className="sidebar-nav">
-          {NAV_ITEMS.map(item => (
+          {NAV_ITEMS
+            .filter(item => !item.requiredRoles || item.requiredRoles.includes(userRole))
+            .map(item => (
             <Link 
               key={item.path}
               to={item.path} 

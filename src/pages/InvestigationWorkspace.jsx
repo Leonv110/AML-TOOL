@@ -175,7 +175,7 @@ export default function InvestigationWorkspace() {
               <div className="info-row">
                 <span className="info-label">Income</span>
                 <span className="info-value">
-                  {customer.income ? `$${parseFloat(customer.income).toLocaleString()}` : 'N/A'}
+                  {customer.income ? `₹${parseFloat(customer.income).toLocaleString('en-IN')}` : 'N/A'}
                 </span>
               </div>
               {risk && (
@@ -222,7 +222,7 @@ export default function InvestigationWorkspace() {
                     </div>
                     <div className="event-detail">
                       <span className="event-amount">
-                        ${parseFloat(tx.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        ₹{parseFloat(tx.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </span>
                       {tx.country ? ` → ${tx.country}` : ''}
                       {tx.rule_triggered && (

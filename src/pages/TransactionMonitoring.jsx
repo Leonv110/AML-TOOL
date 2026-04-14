@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { apiGet } from '../apiClient';
 import { fetchAllTransactions, fetchRules, toggleRuleStatus, fetchAlertCountForRule } from '../services/dataService';
 import { logEvent } from '../services/auditService';
+import { useStudentRestrictions } from '../hooks/useStudentRestrictions';
 import * as XLSX from 'xlsx';
 import './pages.css';
 
@@ -15,6 +16,7 @@ export default function TransactionMonitoring() {
   const [countries, setCountries] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [showFlaggedOnly, setShowFlaggedOnly] = useState(false);
+  const { canExport } = useStudentRestrictions();
   const PAGE_SIZE = 100;
 
   useEffect(() => {
@@ -135,7 +137,7 @@ export default function TransactionMonitoring() {
         <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', justifyContent: 'flex-end' }}>
           <button className="btn btn-secondary" onClick={handleClearFilters} aria-label="Clear filters">Clear Filters</button>
           <button className="btn btn-primary" onClick={handleApplyFilters} aria-label="Apply filters">Apply Filters</button>
-          <button className="btn btn-secondary" aria-label="Export to Excel" style={{ color: '#22c55e', borderColor: 'rgba(34, 197, 94, 0.3)' }}
+          {canExport && <button className="btn btn-secondary" aria-label="Export to Excel" style={{ color: '#22c55e', borderColor: 'rgba(34, 197, 94, 0.3)' }}
             disabled={transactions.length === 0}
             onClick={() => {
               const ws = XLSX.utils.json_to_sheet(transactions.map(tx => ({
@@ -162,7 +164,7 @@ export default function TransactionMonitoring() {
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
             Export Excel
-          </button>
+          </button>}
         </div>
       </div>
 

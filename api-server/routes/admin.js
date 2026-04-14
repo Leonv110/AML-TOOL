@@ -79,7 +79,7 @@ router.post('/users', authenticateToken, requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
 
-    const validRoles = ['student', 'investigator', 'admin'];
+    const validRoles = ['student', 'investigator', 'admin', 'exam'];
     if (!validRoles.includes(role)) {
       client.release();
       return res.status(400).json({ error: `Invalid role. Must be one of: ${validRoles.join(', ')}` });
@@ -131,7 +131,7 @@ router.patch('/users/:id/role', authenticateToken, requireAdmin, async (req, res
     const { id } = req.params;
     const { role } = req.body;
 
-    const validRoles = ['student', 'investigator', 'admin'];
+    const validRoles = ['student', 'investigator', 'admin', 'exam'];
     if (!validRoles.includes(role)) {
       return res.status(400).json({ error: `Invalid role. Must be one of: ${validRoles.join(', ')}` });
     }

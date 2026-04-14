@@ -130,7 +130,17 @@ router.post('/:customerId/screen', authenticateToken, async (req, res) => {
 });
 
 // POST /api/customers/manual-screen — Send formatted payload to AML Watcher
-router.post('/manual-screen', async (req, res) => {
+// Per-user rate limiting: max 10 screening requests per user per hour
+const rateLimit = require('express-rate-limit');
+const screeningLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10,
+  keyGenerator: (req) => req.user?.id || req.ip, // per-user, not per-IP
+  message: { error: 'Screening limit reached (10/hour). Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+router.post('/manual-screen', authenticateToken, screeningLimiter, async (req, res) => {
   try {
     let payload = { ...req.body };
     const apiKey = process.env.AMLWATCHER_API_KEY;

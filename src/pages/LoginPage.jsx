@@ -55,10 +55,10 @@ export default function LoginPage() {
                 
                 {/* --- Left Panel: Dynamic Information --- */}
                 <div className="auth-info-panel glass-panel">
-                    <div className="info-brand">
+                    <Link to="/" className="info-brand" style={{ textDecoration: 'none' }}>
                         <img src="/logo.webp" alt="GAFA Logo" style={{ width: '48px', height: '48px', objectFit: 'contain' }} />
                         <h2>Global Association of <br/> Forensic Accountants</h2>
-                    </div>
+                    </Link>
                     
                     <div className="info-content">
                         <h3>Welcome to the GAFA AML Ecosystem</h3>
@@ -79,24 +79,11 @@ export default function LoginPage() {
                 {/* --- Right Panel: Auth Form --- */}
                 <div className="auth-form-panel glass-panel">
                     <div className="auth-header">
-                        <h2>{isSignup ? 'Create Account' : 'Platform Access'}</h2>
+                        <h2>Platform Access</h2>
                         <p className="auth-subtitle">Verify clearance to proceed</p>
                     </div>
 
                     <form onSubmit={handleSubmit} className="auth-form">
-                        <div className="form-toggle">
-                            <button 
-                                type="button" 
-                                className={!isSignup ? 'active' : ''} 
-                                onClick={() => {setIsSignup(false); clearError();}}
-                            >Login</button>
-                            <button 
-                                type="button" 
-                                className={isSignup ? 'active' : ''} 
-                                onClick={() => {setIsSignup(true); clearError();}}
-                            >Register</button>
-                        </div>
-
                         {displayError && (
                             <div className="auth-error glass-card">
                                 <AlertCircle size={18} />
@@ -137,30 +124,19 @@ export default function LoginPage() {
                             </div>
                         </div>
 
-                        <div className="gafa-input-group">
-                            <label>Designated Role</label>
-                            <select 
-                                className="gafa-input gafa-select"
-                                value={role} 
-                                onChange={(e) => setRole(e.target.value)}
-                            >
-                                <option value="student">Forensic Student</option>
-                                <option value="investigator">Investigator / Trainer</option>
-                            </select>
-                        </div>
 
                         <button 
                             type="submit" 
                             className="gafa-btn gafa-btn-primary full-width"
                             disabled={isSubmitting}
                         >
-                            {isSubmitting ? 'Processing...' : (isSignup ? 'Create Account' : 'Secure Sign In')}
-                            {!isSubmitting && (isSignup ? <UserPlus size={18} /> : <LogIn size={18} />)}
+                            {isSubmitting ? 'Processing...' : 'Secure Sign In'}
+                            {!isSubmitting && <LogIn size={18} />}
                         </button>
                     </form>
 
                     <div className="auth-footer">
-                        <p>By accesssing this portal, you agree to our</p>
+                        <p>Need an account? <a href="mailto:admin@gafa.org" style={{ color: 'var(--gafa-accent)' }}>Contact your administrator</a></p>
                         <div className="footer-links">
                             <Link to="/terms">Terms of Service</Link>
                             <span>•</span>

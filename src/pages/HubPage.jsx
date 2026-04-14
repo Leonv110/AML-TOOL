@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
   LayoutDashboard, Users, UserCheck, Activity,
@@ -71,6 +71,7 @@ const MODULES = [
     icon: <Upload size={28} />,
     path: '/ingestion',
     color: '#a78bfa',
+    requiredRoles: ['admin', 'investigator'],
   },
 ];
 
@@ -100,9 +101,10 @@ export default function HubPage() {
   const displayName = user?.email?.split('@')[0] || 'User';
   const capitalizedName = displayName.charAt(0).toUpperCase() + displayName.slice(1);
 
+  const baseModules = MODULES.filter(m => !m.requiredRoles || m.requiredRoles.includes(userRole));
   const allModules = userRole === 'admin'
-    ? [...MODULES, ...ADMIN_MODULES]
-    : MODULES;
+    ? [...baseModules, ...ADMIN_MODULES]
+    : baseModules;
 
   const handleLogout = () => {
     logout();
@@ -115,13 +117,13 @@ export default function HubPage() {
 
       {/* Top Bar */}
       <header className="hub-topbar">
-        <div className="hub-brand">
+        <Link to="/" className="hub-brand" style={{ textDecoration: 'none' }}>
           <img src="/logo.webp" alt="GAFA" className="hub-logo" />
           <div className="hub-brand-text">
             <span className="hub-brand-name">GAFA</span>
             <span className="hub-brand-sub">AML Tool</span>
           </div>
-        </div>
+        </Link>
         <div className="hub-user-section">
           <div className="hub-user-info">
             <div className="hub-user-avatar">{user?.email?.[0]?.toUpperCase() || 'U'}</div>

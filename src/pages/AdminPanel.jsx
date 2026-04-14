@@ -313,6 +313,7 @@ export default function AdminPanel() {
                     >
                       <option value="student">Student</option>
                       <option value="investigator">Investigator</option>
+                      <option value="exam">Exam</option>
                       <option value="admin">Admin</option>
                     </select>
                   </div>
@@ -366,6 +367,7 @@ export default function AdminPanel() {
                         >
                           <option value="student">Student</option>
                           <option value="investigator">Investigator</option>
+                          <option value="exam">Exam</option>
                           <option value="admin">Admin</option>
                         </select>
                       </td>

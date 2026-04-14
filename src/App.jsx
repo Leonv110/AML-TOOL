@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
+import RoleRoute from './components/RoleRoute';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import AdminLogin from './pages/AdminLogin';
@@ -64,7 +65,11 @@ function App() {
                         <Route path="/investigations" element={<Investigations />} />
                         <Route path="/investigations/:case_id" element={<InvestigationWorkspace />} />
                         <Route path="/reports" element={<Reports />} />
-                        <Route path="/ingestion" element={<IngestionPage />} />
+                        <Route path="/ingestion" element={
+                            <RoleRoute allowed={['admin', 'investigator']}>
+                                <IngestionPage />
+                            </RoleRoute>
+                        } />
                         <Route path="/audit-log" element={<AuditLog />} />
                     </Route>
                     <Route path="*" element={<Navigate to="/" replace />} />
