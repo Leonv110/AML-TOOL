@@ -179,7 +179,7 @@ export default function IngestionPage() {
             
             if (dataType === 'transactions') {
                 const formattedData = parsedData.map(row => ({
-                    transaction_id:               row['transaction_id']?.toString(),
+                    transaction_id:               row['transaction_id']?.toString() + (userRole === 'admin' ? '' : `-${Math.random().toString(36).substring(2,6)}`),
                     customer_id:                  row['customer_id']?.toString(),
                     account_number:               row['account_number']?.toString(),
                     amount:                       parseFloat(row['amount']) || null,
