@@ -4,7 +4,44 @@ const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
-// GET /api/transactions — fetch user's transactions with optional filters
+/**
+ * @swagger
+ * /transactions:
+ *   get:
+ *     summary: Fetch transactions with optional filters
+ *     tags: [Transactions]
+ *     parameters:
+ *       - in: query
+ *         name: startDate
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: endDate
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: minAmount
+ *         schema: { type: number }
+ *       - in: query
+ *         name: maxAmount
+ *         schema: { type: number }
+ *       - in: query
+ *         name: country
+ *         schema: { type: string }
+ *       - in: query
+ *         name: rule
+ *         schema: { type: string }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 500, maximum: 50000 }
+ *     responses:
+ *       200:
+ *         description: Array of transactions
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Transaction'
+ */
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const { startDate, endDate, minAmount, maxAmount, country, rule, page } = req.query;
@@ -35,7 +72,29 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-// PATCH /api/transactions/flag — batch update flagged status on user's transactions
+/**
+ * @swagger
+ * /transactions/flag:
+ *   patch:
+ *     summary: Batch-flag transactions with rule violations
+ *     tags: [Transactions]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: array
+ *             items:
+ *               type: object
+ *               properties:
+ *                 transaction_id: { type: string }
+ *                 flag_reason: { type: string }
+ *                 rule_triggered: { type: string }
+ *                 risk_score: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Number of transactions updated
+ */
 router.patch('/flag', authenticateToken, async (req, res) => {
   try {
     const updates = req.body;
@@ -93,7 +152,21 @@ router.patch('/flag', authenticateToken, async (req, res) => {
   }
 });
 
-// GET /api/transactions/customer/:customerId — transactions for a customer
+/**
+ * @swagger
+ * /transactions/customer/{customerId}:
+ *   get:
+ *     summary: Get transactions for a specific customer
+ *     tags: [Transactions]
+ *     parameters:
+ *       - in: path
+ *         name: customerId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Array of customer transactions
+ */
 router.get('/customer/:customerId', authenticateToken, async (req, res) => {
   try {
     const { rows } = await pool.query(
@@ -107,7 +180,24 @@ router.get('/customer/:customerId', authenticateToken, async (req, res) => {
   }
 });
 
-// POST /api/transactions — insert transactions (batch) with user ownership
+/**
+ * @swagger
+ * /transactions:
+ *   post:
+ *     summary: Bulk insert transactions (with auto-customer creation)
+ *     tags: [Transactions]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: array
+ *             items:
+ *               $ref: '#/components/schemas/Transaction'
+ *     responses:
+ *       200:
+ *         description: Number of transactions inserted
+ */
 router.post('/', authenticateToken, async (req, res) => {
   try {
     const transactions = req.body;
@@ -202,7 +292,16 @@ router.post('/', authenticateToken, async (req, res) => {
   }
 });
 
-// DELETE /api/transactions — delete only current user's transactions (and alerts)
+/**
+ * @swagger
+ * /transactions:
+ *   delete:
+ *     summary: Delete all transactions for current user
+ *     tags: [Transactions]
+ *     responses:
+ *       200:
+ *         description: Count of deleted transactions and alerts
+ */
 router.delete('/', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;

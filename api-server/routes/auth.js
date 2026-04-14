@@ -5,6 +5,8 @@ const pool = require('../db');
 const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
+const { validate, schemas } = require('../middleware/validate');
+
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
   console.error('❌ FATAL: JWT_SECRET environment variable is not set!');
@@ -12,8 +14,24 @@ if (!JWT_SECRET) {
 }
 const TOKEN_EXPIRY = '24h';
 
-// POST /api/auth/signup
-router.post('/signup', async (req, res) => {
+/**
+ * @swagger
+ * /auth/signup:
+ *   post:
+ *     summary: Register a new account (currently disabled)
+ *     tags: [Authentication]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/LoginRequest'
+ *     responses:
+ *       403:
+ *         description: Signup is restricted — admin must create accounts
+ */
+router.post('/signup', validate(schemas.signup), async (req, res) => {
   const client = await pool.connect();
   try {
     const { email, password, role = 'student' } = req.body;
@@ -79,8 +97,30 @@ router.post('/signup', async (req, res) => {
   }
 });
 
-// POST /api/auth/login
-router.post('/login', async (req, res) => {
+/**
+ * @swagger
+ * /auth/login:
+ *   post:
+ *     summary: Login with email and password
+ *     tags: [Authentication]
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/LoginRequest'
+ *     responses:
+ *       200:
+ *         description: JWT token and user profile
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/LoginResponse'
+ *       401:
+ *         description: Invalid credentials
+ */
+router.post('/login', validate(schemas.login), async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -126,7 +166,18 @@ router.post('/login', async (req, res) => {
 // NOTE: seed-admin endpoint removed — use seed-admin.js CLI script instead
 // Run: node seed-admin.js (requires DATABASE_URL and JWT_SECRET in .env)
 
-// GET /api/auth/me — get current user from token
+/**
+ * @swagger
+ * /auth/me:
+ *   get:
+ *     summary: Get current user profile from JWT token
+ *     tags: [Authentication]
+ *     responses:
+ *       200:
+ *         description: Current user and role
+ *       401:
+ *         description: Not authenticated
+ */
 router.get('/me', authenticateToken, async (req, res) => {
   try {
     const userResult = await pool.query(

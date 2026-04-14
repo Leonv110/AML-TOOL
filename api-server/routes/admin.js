@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const pool = require('../db');
 const axios = require('axios');
 const { authenticateToken } = require('../middleware/auth');
+const { validate, schemas } = require('../middleware/validate');
 const router = express.Router();
 
 // Middleware: require admin role
@@ -13,7 +14,21 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-// GET /api/admin/health-check
+/**
+ * @swagger
+ * /admin/health-check:
+ *   get:
+ *     summary: Check system health (API, DB, ML)
+ *     tags: [Admin]
+ *     security: []
+ *     responses:
+ *       200:
+ *         description: Service health status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/HealthCheck'
+ */
 router.get('/health-check', async (req, res) => {
   const health = {
     api: 'online',
@@ -48,7 +63,18 @@ router.get('/health-check', async (req, res) => {
 // USER MANAGEMENT (Admin-only)
 // ============================================================
 
-// GET /api/admin/users — List all users with their roles
+/**
+ * @swagger
+ * /admin/users:
+ *   get:
+ *     summary: List all registered users (admin only)
+ *     tags: [Admin]
+ *     responses:
+ *       200:
+ *         description: Array of users with roles
+ *       403:
+ *         description: Admin access required
+ */
 router.get('/users', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(`
@@ -64,8 +90,27 @@ router.get('/users', authenticateToken, requireAdmin, async (req, res) => {
   }
 });
 
-// POST /api/admin/users — Create a new user (admin-only)
-router.post('/users', authenticateToken, requireAdmin, async (req, res) => {
+/**
+ * @swagger
+ * /admin/users:
+ *   post:
+ *     summary: Create a new user account (admin only)
+ *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AdminCreateUser'
+ *     responses:
+ *       201:
+ *         description: User created successfully
+ *       400:
+ *         description: Validation error
+ *       409:
+ *         description: User already exists
+ */
+router.post('/users', authenticateToken, requireAdmin, validate(schemas.adminCreateUser), async (req, res) => {
   const client = await pool.connect();
   try {
     const { email, password, role = 'student' } = req.body;
@@ -125,8 +170,31 @@ router.post('/users', authenticateToken, requireAdmin, async (req, res) => {
   }
 });
 
-// PATCH /api/admin/users/:id/role — Update a user's role
-router.patch('/users/:id/role', authenticateToken, requireAdmin, async (req, res) => {
+/**
+ * @swagger
+ * /admin/users/{id}/role:
+ *   patch:
+ *     summary: Update a user's role (admin only)
+ *     tags: [Admin]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AdminCreateUser'
+ *     responses:
+ *       200:
+ *         description: Role updated
+ *       400:
+ *         description: Invalid role
+ */
+router.patch('/users/:id/role', authenticateToken, requireAdmin, validate(schemas.adminUpdateRole), async (req, res) => {
   try {
     const { id } = req.params;
     const { role } = req.body;

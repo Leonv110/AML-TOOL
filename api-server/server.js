@@ -53,6 +53,16 @@ app.use('/api/', limiter);
 
 app.use(express.json({ limit: '50mb' })); // Allow large payloads for bulk ingestion
 
+// --- Swagger API Documentation ---
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./swagger');
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'GAFA AML API Documentation',
+}));
+// Serve raw OpenAPI spec as JSON
+app.get('/api/docs.json', (req, res) => res.json(swaggerSpec));
+
 // Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/customers', require('./routes/customers'));
@@ -76,6 +86,10 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
+
+// --- Centralized Error Handler (must be AFTER all routes) ---
+const errorHandler = require('./middleware/errorHandler');
+app.use(errorHandler);
 
 // Keep-Alive Mechanism to prevent Render from spinning down free tier services
 const axios = require('axios');
