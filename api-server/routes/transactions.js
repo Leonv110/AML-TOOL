@@ -52,6 +52,7 @@ router.patch('/flag', authenticateToken, async (req, res) => {
       
       let flagReasonCases = '';
       let ruleTriggeredCases = '';
+      let riskScoreCases = '';
       const params = [];
       let pIdx = 1;
 
@@ -60,6 +61,8 @@ router.patch('/flag', authenticateToken, async (req, res) => {
         params.push(u.transaction_id, u.flag_reason || '');
         ruleTriggeredCases += ` WHEN transaction_id = $${pIdx++} THEN $${pIdx++}`;
         params.push(u.transaction_id, u.rule_triggered || '');
+        riskScoreCases += ` WHEN transaction_id = $${pIdx++} THEN $${pIdx++}`;
+        params.push(u.transaction_id, u.risk_score || 0);
       }
 
       const idPlaceholders = ids.map(() => `$${pIdx++}`);
@@ -73,7 +76,8 @@ router.patch('/flag', authenticateToken, async (req, res) => {
         UPDATE transactions SET
           flagged = TRUE,
           flag_reason = CASE ${flagReasonCases} END,
-          rule_triggered = CASE ${ruleTriggeredCases} END
+          rule_triggered = CASE ${ruleTriggeredCases} END,
+          risk_score = CASE ${riskScoreCases} END
         WHERE transaction_id IN (${idPlaceholders.join(', ')})
           AND (uploaded_by = ${userFilter} OR uploaded_by IS NULL)
       `;

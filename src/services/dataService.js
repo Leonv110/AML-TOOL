@@ -246,63 +246,128 @@ export async function adminUpdateUserRole(userId, role) {
 export function applyAMLRules(transaction, activeRuleNames, contextTxns = []) {
   let score = 0;
   let triggered_rules = [];
+  const amount = parseFloat(transaction.amount) || 0;
 
-  // 1. Geographic Risk (Blacklisted/Grey FATF - e.g. Iran) [Weight: 25]
-  const highRiskCountries = ['iran', 'north korea', 'myanmar', 'syria', 'yemen', 'mali'];
-  const isHighRiskCountry = highRiskCountries.includes((transaction.country || '').toLowerCase()) || 
-                            (transaction.country_risk_level || '').toLowerCase() === 'high';
-                            
-  if (activeRuleNames.has('Geographic Risk') && isHighRiskCountry) {
-    score += 25;
-    triggered_rules.push('Geographic Risk');
-  }
-
-  // 2. Clustering / Structuring Rule [Weight: 25]
-  if (activeRuleNames.has('Structuring')) {
-    const isStructuringAmount = (transaction.amount >= 9000 && transaction.amount <= 10000) || 
-                                (transaction.amount >= 100000 && transaction.amount <= 500000);
-                                
-    if (contextTxns.length > 0 && isStructuringAmount) {
-      const thirtyDaysAgo = new Date(transaction.transaction_date || Date.now());
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      const recentTxns = contextTxns.filter(t => 
-        new Date(t.transaction_date) >= thirtyDaysAgo && 
-        new Date(t.transaction_date) <= new Date(transaction.transaction_date || Date.now()) &&
-        ((t.amount >= 9000 && t.amount <= 10000) || (t.amount >= 100000 && t.amount <= 500000))
-      );
-      
-      const sum = recentTxns.reduce((a, b) => a + parseFloat(b.amount || 0), 0) + parseFloat(transaction.amount);
-      if ((sum >= 50000 || sum >= 900000) && recentTxns.length >= 1) { // Current + 1 or more recent
-        score += 25;
-        triggered_rules.push('Clustering/Structuring');
-      }
-    } else if (isStructuringAmount) {
-        score += 10;
-        triggered_rules.push('Possible Structuring');
+  // 1. Geographic Risk [Weight: 25]
+  const highRiskCountries = ['iran', 'north korea', 'myanmar', 'syria', 'yemen', 'mali',
+    'nigeria', 'afghanistan', 'iraq', 'libya', 'somalia', 'south sudan'];
+  const medRiskCountries = ['uae', 'pakistan', 'russia', 'turkey', 'lebanon', 'haiti', 'panama'];
+  const country = (transaction.country || '').toLowerCase().trim();
+  const riskLevel = (transaction.country_risk_level || '').toLowerCase();
+  
+  if (activeRuleNames.has('Geographic Risk')) {
+    if (highRiskCountries.includes(country) || riskLevel === 'high') {
+      score += 25;
+      triggered_rules.push('Geographic Risk');
+    } else if (medRiskCountries.includes(country) || riskLevel === 'medium') {
+      score += 10;
+      triggered_rules.push('Geographic Risk (Medium)');
     }
   }
 
-  // 3. Layering [Weight: 20]
-  if (activeRuleNames.has('Layering') && transaction.path_length_hops >= 4 && transaction.degree_centrality > 0.5) {
-    score += 20;
-    triggered_rules.push('Layering');
+  // 2. Structuring / Clustering [Weight: 25]
+  if (activeRuleNames.has('Structuring')) {
+    // Check if amount is just under common reporting thresholds
+    const isStructuring = (amount >= 9000 && amount < 10000) ||
+                          (amount >= 48000 && amount < 50000) ||
+                          (amount >= 90000 && amount < 100000) ||
+                          (amount >= 900000 && amount < 1000000);
+    
+    if (isStructuring) {
+      // Check for clustering: multiple similar transactions from same customer in 30 days
+      if (contextTxns.length > 0) {
+        const thirtyDaysAgo = new Date(transaction.transaction_date || Date.now());
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const recentSimilar = contextTxns.filter(t => {
+          const tDate = new Date(t.transaction_date);
+          const tAmt = parseFloat(t.amount) || 0;
+          return tDate >= thirtyDaysAgo && t.transaction_id !== transaction.transaction_id &&
+            ((tAmt >= 9000 && tAmt < 10000) || (tAmt >= 48000 && tAmt < 50000) ||
+             (tAmt >= 90000 && tAmt < 100000) || (tAmt >= 900000 && tAmt < 1000000));
+        });
+        if (recentSimilar.length >= 1) {
+          score += 25;
+          triggered_rules.push('Clustering/Structuring');
+        } else {
+          score += 10;
+          triggered_rules.push('Possible Structuring');
+        }
+      } else {
+        score += 10;
+        triggered_rules.push('Possible Structuring');
+      }
+    }
   }
 
-  // 4. Velocity Spike [Weight: 15]
-  let isVelSpike = false;
-  if (activeRuleNames.has('Velocity Spike') && transaction.transaction_frequency_1hr >= 5) {
-    score += 15;
-    triggered_rules.push('Velocity Spike');
-    isVelSpike = true;
-  } else if (activeRuleNames.has('Velocity Spike') && !isVelSpike && transaction.transaction_frequency_1hr >= (transaction.avg_frequency_1hr || 1) * 3) {
-    score += 15;
-    triggered_rules.push('Velocity Spike (3x Avg)');
+  // 3. Velocity Spike [Weight: 15]
+  if (activeRuleNames.has('Velocity Spike')) {
+    const freq = parseFloat(transaction.transaction_frequency_1hr) || 0;
+    const avgFreq = parseFloat(transaction.avg_frequency_1hr) || 1;
+    if (freq >= 5) {
+      score += 15;
+      triggered_rules.push('Velocity Spike');
+    } else if (freq >= avgFreq * 3 && freq >= 2) {
+      score += 15;
+      triggered_rules.push('Velocity Spike (3x Avg)');
+    }
   }
 
-  // 5. Dormancy Activation [Weight: 15]
-  if (activeRuleNames.has('Dormancy Activation') && transaction.days_since_last_transaction >= 30) {
-    score += 15;
-    triggered_rules.push('Dormancy Activation');
+  // 4. Dormancy Activation [Weight: 15]
+  if (activeRuleNames.has('Dormancy Activation')) {
+    const daysSince = parseFloat(transaction.days_since_last_transaction) || 0;
+    if (daysSince >= 30) {
+      score += 15;
+      triggered_rules.push('Dormancy Activation');
+    }
+  }
+
+  // 5. Layering [Weight: 20]
+  if (activeRuleNames.has('Layering')) {
+    const hops = parseFloat(transaction.path_length_hops) || 0;
+    const centrality = parseFloat(transaction.degree_centrality) || 0;
+    if (hops >= 4 && centrality > 0.5) {
+      score += 20;
+      triggered_rules.push('Layering');
+    }
+  }
+
+  // 6. PEP / HNI Flag [Weight: 15]
+  if (activeRuleNames.has('PEP / HNI Flag')) {
+    if (transaction.pep_flag === true || transaction.pep_flag === 'true') {
+      score += 15;
+      triggered_rules.push('PEP Flag');
+    }
+  }
+
+  // 7. New Device High Value [Weight: 10]
+  if (activeRuleNames.has('New Device High Value')) {
+    if (transaction.is_new_device && amount > 50000) {
+      score += 10;
+      triggered_rules.push('New Device High Value');
+    }
+  }
+
+  // 8. Rapid Fund Movement [Weight: 15]
+  if (activeRuleNames.has('Rapid Fund Movement')) {
+    const balBefore = parseFloat(transaction.balance_before) || 0;
+    if (balBefore > 0 && amount >= balBefore * 0.8) {
+      score += 15;
+      triggered_rules.push('Rapid Fund Movement');
+    }
+  }
+
+  // 9. Income Mismatch [Weight: 15] — if income data available in context
+  if (activeRuleNames.has('Income Mismatch') && contextTxns.length > 0) {
+    const thirtyDaysAgo = new Date(transaction.transaction_date || Date.now());
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const recentSum = contextTxns
+      .filter(t => new Date(t.transaction_date) >= thirtyDaysAgo)
+      .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+    // Flag if 30-day total exceeds 10 lakhs (CTR threshold)
+    if (recentSum >= 1000000) {
+      score += 15;
+      triggered_rules.push('Income Mismatch / CTR Threshold');
+    }
   }
 
   let severity = 'LOW';

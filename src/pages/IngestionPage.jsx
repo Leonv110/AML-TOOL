@@ -299,10 +299,11 @@ export default function IngestionPage() {
         try {
             const startTime = Date.now();
 
-            // Step 1: Fetch the transactions we just uploaded (all of them)
+            // Step 1: Fetch only UNFLAGGED transactions to process
             setAmlProgress(10);
-            const transactions = await apiGet(`/api/transactions?limit=50000`);
-            const totalTxns = transactions?.length || 0;
+            const allTxns = await apiGet(`/api/transactions?limit=50000`);
+            const transactions = (allTxns || []).filter(t => !t.flagged);
+            const totalTxns = transactions.length;
 
             if (totalTxns === 0) {
                 setAmlResult({ processed: 0, flagged: 0, alerts_created: 0, duration_seconds: 0 });
