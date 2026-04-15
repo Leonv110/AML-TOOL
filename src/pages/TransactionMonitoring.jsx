@@ -294,7 +294,7 @@ export default function TransactionMonitoring() {
         {rules.length === 0 ? (
           <div className="empty-state">
             <h3>No rules configured</h3>
-            <p>Run the migration SQL to seed 8 AML detection rules.</p>
+            <p>Run the seed script to populate the 10 AML detection rules.</p>
           </div>
         ) : (
           <table className="data-table">

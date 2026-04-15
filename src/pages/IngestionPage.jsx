@@ -765,7 +765,7 @@ export default function IngestionPage() {
                     <p style={{ fontSize: '12px', color: '#94a3b8' }}>
                       {dataType === 'customers'
                         ? 'Screening customers against AML watchlists...'
-                        : 'Processing transactions against AML rules...'}
+                        : 'Processing transactions against 10 AML rules...'}
                     </p>
                   </div>
                 )}
