@@ -272,40 +272,54 @@ export function applyAMLRules(transaction, activeRuleNames, contextTxns = []) {
   // 2. Structuring / Clustering [Weight: 25]
   //    Only flag if there's actual clustering evidence (multiple near-threshold txns)
   if (activeRuleNames.has('Structuring')) {
-    const isStructuring = (amount >= 9000 && amount < 10000) ||
-                          (amount >= 48000 && amount < 50000) ||
-                          (amount >= 90000 && amount < 100000) ||
-                          (amount >= 900000 && amount < 1000000);
+    const isStructuring = amount < 1000000 && amount >= 50000;
     
     if (isStructuring && contextTxns.length > 0) {
       const thirtyDaysAgo = new Date(transaction.transaction_date || Date.now());
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      const recentSimilar = contextTxns.filter(t => {
-        if (new Date(t.transaction_date) < thirtyDaysAgo || t.transaction_id === transaction.transaction_id) return false;
-        const amt = parseFloat(t.amount);
-        return (amt >= 9000 && amt < 10000) || (amt >= 48000 && amt < 50000);
+
+      let sumBelowThreshold = amount;
+      let countBelowThreshold = 1;
+
+      contextTxns.forEach(t => {
+        if (new Date(t.transaction_date) >= thirtyDaysAgo && t.transaction_id !== transaction.transaction_id) {
+          const amt = parseFloat(t.amount);
+          if (amt < 1000000 && amt >= 50000) {
+            sumBelowThreshold += amt;
+            countBelowThreshold += 1;
+          }
+        }
       });
-      if (recentSimilar.length >= 2) {
+
+      if (sumBelowThreshold >= 1000000 && countBelowThreshold >= 2) {
         score += 25;
-        triggered_rules.push('Structuring (Repeated below-threshold amounts)');
-      } else if (recentSimilar.length === 1) {
-        score += 12;
+        triggered_rules.push('Structuring (Breaking ₹10L limit)');
+      } else if (sumBelowThreshold >= 800000 && countBelowThreshold >= 3) {
+        score += 15;
         triggered_rules.push('Possible Structuring Pattern');
       }
-      // Single near-threshold amount with no pattern = not flagged (normal transaction)
     }
   }
 
-  // 3. Velocity Spike [Weight: 25]
+  // 3. Velocity Spike [Weight: 35]
   if (activeRuleNames.has('Velocity Spike')) {
     const freq = parseFloat(transaction.transaction_frequency_1hr) || 0;
     const avgFreq = parseFloat(transaction.avg_frequency_1hr) || 2;
-    if (freq >= 7) {
-      score += 25;
-      triggered_rules.push('Velocity Spike (Extreme)');
+    
+    // Connect to time of day (odd hours e.g. IST midnight to 5AM)
+    const txDate = new Date(transaction.transaction_date || Date.now());
+    const istHour = (txDate.getUTCHours() + 5.5) % 24;
+    const isOddHour = istHour >= 0 && istHour <= 5;
+    
+    if (freq >= 7 && isOddHour) {
+      score += 35;
+      triggered_rules.push('Velocity Spike (Extreme at Odd Hours)');
     } else if (freq >= 4 && freq >= avgFreq * 3) {
       score += 25;
       triggered_rules.push('Velocity Spike (High Context)');
+    } else if (isOddHour && amount > 10000) {
+      score += 15;
+      triggered_rules.push('Velocity Spike (Odd Hour Activity)');
     }
   }
 
@@ -342,21 +356,30 @@ export function applyAMLRules(transaction, activeRuleNames, contextTxns = []) {
     }
   }
 
-  // 7. New Device High Value [Weight: 15]
-  //    Raised amount threshold to 100K (was 50K)
+  // 7. New Device High Value [Weight: 10]
+  //    Keep rule but reduce weightage significantly (used to be 25)
   if (activeRuleNames.has('New Device High Value')) {
     if (transaction.is_new_device && amount > 20000) {
-      score += 25;
+      score += 10;
       triggered_rules.push('New Device High Value ($20k+)');
     }
   }
 
-  // 8. Rapid Fund Movement [Weight: 25]
+  // 8. Rapid Fund Movement [Weight: 35]
   if (activeRuleNames.has('Rapid Fund Movement')) {
     const balBefore = parseFloat(transaction.balance_before) || 0;
     if (balBefore > 0 && amount >= balBefore * 0.85 && amount > 8000) {
-      score += 25;
-      triggered_rules.push('Rapid Movement (>85% draint)');
+      score += 35;
+      triggered_rules.push('Rapid Movement (>85% drain)');
+    }
+  }
+
+  // 8b. Cryptocurrency Activity [Weight: 35]
+  if (activeRuleNames.has('Cryptocurrency Activity')) {
+    if ((transaction.transaction_type || '').toLowerCase().includes('crypto') ||
+        (transaction.destination_id || '').toLowerCase().includes('crypto')) {
+      score += 35;
+      triggered_rules.push('Cryptocurrency Dealings');
     }
   }
 
