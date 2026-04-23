@@ -170,9 +170,9 @@ export default function CustomerProfile() {
             <span className="info-value">{customer.occupation || 'N/A'}</span>
           </div>
           <div className="info-row">
-            <span className="info-label">Income</span>
+            <span className="info-label">Average Income</span>
             <span className="info-value">
-              {customer.income ? `₹${parseFloat(customer.income).toLocaleString('en-IN')}` : 'N/A'}
+              {customer.income ? `₹${parseFloat(customer.income).toLocaleString('en-IN')}/mo` : 'N/A'}
             </span>
           </div>
           <div className="info-row">

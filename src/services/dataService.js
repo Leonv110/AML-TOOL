@@ -301,23 +301,28 @@ export function applyAMLRules(transaction, activeRuleNames, contextTxns = []) {
     }
   }
 
-  // 3. Velocity Spike [Weight: 35]
+  // 3. Velocity Spike [Weight: 25-35]
+  //    Odd hours = midnight–5AM IST. Even moderate frequency at odd hours is suspicious.
+  //    "within few minutes or 4-5 hours a person is using it too much" — meeting feedback
   if (activeRuleNames.has('Velocity Spike')) {
     const freq = parseFloat(transaction.transaction_frequency_1hr) || 0;
     const avgFreq = parseFloat(transaction.avg_frequency_1hr) || 2;
     
-    // Connect to time of day (odd hours e.g. IST midnight to 5AM)
+    // IST = UTC+5:30 → compute IST hour from UTC
     const txDate = new Date(transaction.transaction_date || Date.now());
     const istHour = (txDate.getUTCHours() + 5.5) % 24;
-    const isOddHour = istHour >= 0 && istHour <= 5;
+    const isOddHour = istHour >= 0 && istHour < 5;
     
-    if (freq >= 7 && isOddHour) {
+    if (isOddHour && freq >= 3) {
       score += 35;
-      triggered_rules.push('Velocity Spike (Extreme at Odd Hours)');
+      triggered_rules.push('Velocity Spike (Odd Hours + High Frequency)');
+    } else if (freq >= 7) {
+      score += 25;
+      triggered_rules.push('Velocity Spike (Extreme Frequency)');
     } else if (freq >= 4 && freq >= avgFreq * 3) {
       score += 25;
       triggered_rules.push('Velocity Spike (High Context)');
-    } else if (isOddHour && amount > 10000) {
+    } else if (isOddHour && amount > 50000) {
       score += 15;
       triggered_rules.push('Velocity Spike (Odd Hour Activity)');
     }
@@ -370,16 +375,23 @@ export function applyAMLRules(transaction, activeRuleNames, contextTxns = []) {
     const balBefore = parseFloat(transaction.balance_before) || 0;
     if (balBefore > 0 && amount >= balBefore * 0.85 && amount > 8000) {
       score += 35;
-      triggered_rules.push('Rapid Movement (>85% drain)');
+      triggered_rules.push('Rapid Fund Movement (>85% balance drain)');
     }
   }
 
   // 8b. Cryptocurrency Activity [Weight: 35]
+  //     "crypto is a very big problem these days" — meeting feedback
   if (activeRuleNames.has('Cryptocurrency Activity')) {
-    if ((transaction.transaction_type || '').toLowerCase().includes('crypto') ||
-        (transaction.destination_id || '').toLowerCase().includes('crypto')) {
+    const txnType = (transaction.transaction_type || '').toLowerCase();
+    const destId = (transaction.destination_id || '').toLowerCase();
+    const isCrypto = txnType.includes('crypto') || txnType.includes('bitcoin') ||
+                     txnType.includes('eth') || txnType.includes('defi') ||
+                     destId.includes('crypto') || destId.includes('exchange') ||
+                     destId.includes('wallet') || destId.includes('binance') ||
+                     destId.includes('coinbase');
+    if (isCrypto) {
       score += 35;
-      triggered_rules.push('Cryptocurrency Dealings');
+      triggered_rules.push('Cryptocurrency Activity');
     }
   }
 
