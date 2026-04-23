@@ -133,6 +133,16 @@ export default function CustomerProfile() {
 
   const tierClass = risk ? risk.tier.toLowerCase() : 'low';
 
+  const allTriggeredRules = new Set(risk?.rules_triggered || []);
+  alerts.forEach(a => {
+    if (a.rule_triggered) a.rule_triggered.split(', ').forEach(r => allTriggeredRules.add(r.trim()));
+  });
+  transactions.forEach(t => {
+    if ((t.flagged === true || t.flagged === 'true') && t.rule_triggered) {
+      t.rule_triggered.split(', ').forEach(r => allTriggeredRules.add(r.trim()));
+    }
+  });
+
   return (
     <div className="page-container">
       <div className="page-header">
@@ -200,6 +210,29 @@ export default function CustomerProfile() {
                   <span className="value">{risk.breakdown.income_mismatch || 0}/50</span>
                 </div>
               </div>
+              
+              {allTriggeredRules.size > 0 && (
+                <div style={{ marginTop: '1.25rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>
+                    Triggered Rule Flags
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                    {Array.from(allTriggeredRules).map((rule, idx) => (
+                      <span key={idx} style={{ 
+                        fontSize: '0.7rem', 
+                        padding: '0.25rem 0.5rem', 
+                        background: 'rgba(239, 68, 68, 0.1)', 
+                        color: '#ef4444', 
+                        border: '1px solid rgba(239, 68, 68, 0.3)', 
+                        borderRadius: '4px',
+                        fontWeight: 600
+                      }}>
+                        {rule}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>

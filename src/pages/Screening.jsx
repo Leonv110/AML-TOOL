@@ -455,7 +455,7 @@ export default function Screening() {
                             <div key={j} style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                               <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--brand-accent)' }}></div>
                               <span style={{flex: 1}}>{src.publisher}</span>
-                              {src.url && <a href={src.url} target="_blank" rel="noreferrer" style={{ color: 'var(--brand-accent)', textDecoration: 'none', fontSize: '0.75rem', padding: '0.1rem 0.4rem', background: 'rgba(245, 158, 11, 0.1)', borderRadius: '4px' }}>Visit Source</a>}
+                              {src.url && <a href={src.url.startsWith('http') ? src.url : `https://${src.url}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--brand-accent)', textDecoration: 'none', fontSize: '0.75rem', padding: '0.1rem 0.4rem', background: 'rgba(245, 158, 11, 0.1)', borderRadius: '4px' }}>Visit Source</a>}
                             </div>
                           ))}
                         </div>
