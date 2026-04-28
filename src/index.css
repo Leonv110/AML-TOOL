@@ -89,41 +89,45 @@ body {
 }
 
 .glass-card {
-  background: var(--gafa-glass);
+  background: rgba(255, 255, 255, 0.06);
   backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--gafa-glass-border);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 8px;
   padding: 1.5rem;
   transition: var(--transition-smooth);
 }
 
 .glass-card:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
   transform: translateY(-3px);
 }
 
 /* Interactive Elements */
-button.gafa-btn {
+.gafa-btn {
   padding: 0.8rem 1.7rem;
   border-radius: 8px;
   border: none;
   font-family: var(--font-main);
-  font-weight: 500;
+  font-weight: 600;
+  font-size: 0.95rem;
   letter-spacing: 0.5px;
   cursor: pointer;
   transition: var(--transition-smooth);
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 0.6rem;
+  text-decoration: none;
+  color: var(--gafa-text);
 }
 
-button.gafa-btn-primary {
+.gafa-btn-primary {
   background: var(--gafa-accent);
-  color: #000;
+  color: #000 !important;
   box-shadow: 0 4px 15px rgba(14, 179, 167, 0.2);
 }
 
-button.gafa-btn-primary:hover {
+.gafa-btn-primary:hover {
   background: #11cbbb;
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(14, 179, 167, 0.3);
