@@ -5,12 +5,12 @@ import './LandingPage.css';
 
 // Default content (fallback if JSON fails to load)
 const DEFAULTS = {
-  hero: { badge: 'Next-Gen Forensic Intelligence', title: 'Forensic Intelligence', titleAccent: 'Reimagined', subtitle: 'The Global Association of Forensic Accountants (GAFA) provides elite Anti-Money Laundering tools driven by advanced ML ensembles and real-time transaction monitoring.', primaryCta: 'Get Started Now', secondaryCta: 'View Governance' },
-  about: { title: 'About GAFA AML', paragraphs: ['The Global Association of Forensic Accountants (GAFA) has designed this flagship Anti-Money Laundering (AML) platform to bridge the gap between theoretical forensic accounting and practical, AI-driven threat detection.', 'Built specifically for certified financial auditors, regulatory agencies, and forensic accounting students, our platform leverages massive parallel processing to analyze complex transaction networks, identifying layering and smurfing techniques that traditional rule sets fail to capture.'], stats: [{ number: '99.2%', label: 'Anomaly Detection Accuracy' }, { number: '< 50ms', label: 'Real-time Inference' }, { number: 'Global', label: 'Regulatory Compliance' }], securityTitle: 'Bank-grade Security', securitySubtitle: 'E2E Encrypted Forensic Ledgers' },
-  features: { title: 'Core Capabilities', subtitle: 'Enterprise-grade tools for modern financial investigators', items: [{ icon: 'Search', title: 'Advanced ML Detection', description: 'Isolation Forest ensembles detect anomalies that traditional rule-based systems miss.' }, { icon: 'BarChart3', title: 'Real-time Analytics', description: 'Visualize complex transaction webs and identify layered money movements instantly.' }, { icon: 'Database', title: 'Secure Data Vault', description: 'Military-grade encryption for sensitive forensic reports and evidence logs.' }, { icon: 'Lock', title: 'Regulatory Compliance', description: 'Built to align with global AML/CFT requirements and reporting standards.' }] },
-  trust: { title: 'Global Standards. Local Precision.', description: 'GAFA monitors over $50B in transaction volume through our partner networks, ensuring that financial ecosystems remain transparent and secure.' },
-  faq: { title: 'Frequently Asked Questions', subtitle: 'Everything you need to know about the GAFA platform.', items: [{ question: 'Who is this platform built for?', answer: 'It is designed exclusively for certified forensic accountants, AML compliance officers at financial institutions, and students enrolled in GAFA certification programs.' }, { question: 'How does the AI detection work?', answer: 'We utilize an Isolation Forest Ensemble trained on vast, anonymized global transaction datasets. It identifies complex patterns of layering and geographic anomalies that trigger risk alerts before human auditors even look at the data.' }, { question: 'Is my forensic data secure?', answer: 'Absolutely. All data ingested for investigation is processed using AES-256 encryption. We comply with strict data residency laws and automatically scrub PII during bulk AI inference tasks.' }, { question: 'Can I test the platform?', answer: "If you are a registered user, you can use the 'Student Portal' login role to access isolated sandbox environments filled with generated mock financial records for training purposes." }] },
-  footer: { brandDescription: 'Pioneering the future of forensic financial analysis with intelligent, real-time threat detection and comprehensive global compliance.', location: 'GAFA HQ, Mumbai, India', phone: '+91 (22) 1234 5678' },
+  hero: { badge: 'Next-Gen Forensic Intelligence', title: 'Forensic Intelligence', titleAccent: 'Reimagined', subtitle: 'The Global Association of Forensic Accountants (GAFA) provides elite Anti-Money Laundering tools driven by advanced ML ensembles and real-time transaction monitoring.', primaryCta: 'Get Started Now', secondaryCta: 'Join CAML', secondaryCtaLink: 'https://www.gafa.org.in' },
+  about: { title: 'About GAFA AML', paragraphs: ['The Global Association of Forensic Accountants (GAFA) has designed this flagship Anti-Money Laundering (AML) platform to bridge the gap between theoretical forensic accounting and practical, AI-driven threat detection.', 'Built specifically for certified Anti Money Laundering Professionals, Compliance officers and forensic accounting professionals, GAFA AML platform leverages Technology integration in Anti money laundering. The AI agents are used to analyze complex transaction networks, identifying layering and smurfing techniques that traditional rule sets fail to capture.'], stats: [{ number: '30+', label: 'Real-World AML Case Studies' }, { number: '20+', label: 'Practical Monitoring Assignments' }, { number: '5+', label: 'Global AML Frameworks (FATF, RBI, EU AMLD)' }], securityTitle: 'Bank-grade Security', securitySubtitle: 'E2E Encrypted Forensic Ledgers' },
+  features: { title: 'Core Capabilities', subtitle: 'Enterprise-grade tools for modern AML', items: [{ icon: 'Search', title: 'Advanced ML Detection', description: 'Advanced anomaly detection with AI to identify suspicious patterns that traditional rule-based systems miss.' }, { icon: 'BarChart3', title: 'Real-time Analytics', description: 'Visualize complex transaction webs and identify layered money movements instantly.' }, { icon: 'Lock', title: 'Regulatory Compliance', description: 'Built to align with global AML/CFT requirements and reporting standards.' }] },
+  trust: { title: 'Global Standards. Local Precision.', description: 'GAFA engages with partner networks collectively handling significant transaction volumes, supporting transparency and stronger financial oversight practices.' },
+  faq: { title: 'Frequently Asked Questions', subtitle: 'Everything you need to know about the GAFA platform.', items: [{ question: 'Who is this platform designed for?', answer: "It is built for students and professionals enrolled in GAFA's CAML program, especially those in banking, compliance, audit, and financial investigation roles." }, { question: 'How does the detection work?', answer: 'The platform combines rule-based scenarios with basic machine learning models to simulate real transaction monitoring, helping learners identify suspicious patterns and risk indicators.' }, { question: 'Is the data secure?', answer: 'Yes. The platform uses simulated and anonymized data with strong security controls, ensuring a safe training environment without real customer exposure.' }, { question: 'Can learners practice on the platform?', answer: 'Yes. A sandbox environment allows users to analyze mock transactions, generate alerts, and perform investigations in a risk-free setting.' }] },
+  footer: { brandDescription: 'Advancing forensic financial analysis through intelligent monitoring, real-time risk detection, and globally aligned compliance standards.', email: 'info@gafa.org.in', website: 'www.gafa.org.in', copyright: 'Global Association of Forensic Accountants' },
 };
 
 const ICON_MAP = { Search, BarChart3, Database, Lock };
@@ -78,9 +78,9 @@ export default function LandingPage() {
               <button onClick={() => navigate('/login')} className="gafa-btn gafa-btn-primary">
                 {c.hero?.primaryCta || DEFAULTS.hero.primaryCta} <ChevronRight size={18} />
               </button>
-              <button onClick={() => navigate('/terms')} className="gafa-btn glass-card">
+              <a href={c.hero?.secondaryCtaLink || DEFAULTS.hero.secondaryCtaLink} target="_blank" rel="noopener noreferrer" className="gafa-btn glass-card">
                 {c.hero?.secondaryCta || DEFAULTS.hero.secondaryCta}
-              </button>
+              </a>
             </div>
           </div>
           
@@ -175,7 +175,7 @@ export default function LandingPage() {
               <div className="social-links">
                 <a href="#" aria-label="LinkedIn"><Linkedin size={20} /></a>
                 <a href="#" aria-label="Twitter"><Twitter size={20} /></a>
-                <a href="mailto:contact@gafa.org" aria-label="Email"><Mail size={20} /></a>
+                <a href={`mailto:${c.footer?.email || DEFAULTS.footer.email}`} aria-label="Email"><Mail size={20} /></a>
               </div>
             </div>
             
@@ -205,10 +205,10 @@ export default function LandingPage() {
           </div>
           
           <div className="footer-bottom">
-            <p>© {new Date().getFullYear()} Global Association of Forensic Accountants. All rights reserved.</p>
+            <p>© {new Date().getFullYear()} {c.footer?.copyright || DEFAULTS.footer.copyright}. All rights reserved.</p>
             <div className="contact-info">
-              <span><MapPin size={14}/> {c.footer?.location || DEFAULTS.footer.location}</span>
-              <span><Phone size={14}/> {c.footer?.phone || DEFAULTS.footer.phone}</span>
+              <span><Mail size={14}/> {c.footer?.email || DEFAULTS.footer.email}</span>
+              <span><Globe size={14}/> <a href={`https://${c.footer?.website || DEFAULTS.footer.website}`} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>{c.footer?.website || DEFAULTS.footer.website}</a></span>
             </div>
           </div>
         </div>

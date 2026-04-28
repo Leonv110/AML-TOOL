@@ -5,40 +5,36 @@
     "titleAccent": "Reimagined",
     "subtitle": "The Global Association of Forensic Accountants (GAFA) provides elite Anti-Money Laundering tools driven by advanced ML ensembles and real-time transaction monitoring.",
     "primaryCta": "Get Started Now",
-    "secondaryCta": "View Governance"
+    "secondaryCta": "Join CAML",
+    "secondaryCtaLink": "https://www.gafa.org.in"
   },
   "about": {
     "title": "About GAFA AML",
     "paragraphs": [
       "The Global Association of Forensic Accountants (GAFA) has designed this flagship Anti-Money Laundering (AML) platform to bridge the gap between theoretical forensic accounting and practical, AI-driven threat detection.",
-      "Built specifically for certified financial auditors, regulatory agencies, and forensic accounting students, our platform leverages massive parallel processing to analyze complex transaction networks, identifying layering and smurfing techniques that traditional rule sets fail to capture."
+      "Built specifically for certified Anti Money Laundering Professionals, Compliance officers and forensic accounting professionals, GAFA AML platform leverages Technology integration in Anti money laundering. The AI agents are used to analyze complex transaction networks, identifying layering and smurfing techniques that traditional rule sets fail to capture."
     ],
     "stats": [
-      { "number": "99.2%", "label": "Anomaly Detection Accuracy" },
-      { "number": "< 50ms", "label": "Real-time Inference" },
-      { "number": "Global", "label": "Regulatory Compliance" }
+      { "number": "30+", "label": "Real-World AML Case Studies" },
+      { "number": "20+", "label": "Practical Monitoring Assignments" },
+      { "number": "5+", "label": "Global AML Frameworks (FATF, RBI, EU AMLD)" }
     ],
     "securityTitle": "Bank-grade Security",
     "securitySubtitle": "E2E Encrypted Forensic Ledgers"
   },
   "features": {
     "title": "Core Capabilities",
-    "subtitle": "Enterprise-grade tools for modern financial investigators",
+    "subtitle": "Enterprise-grade tools for modern AML",
     "items": [
       {
         "icon": "Search",
         "title": "Advanced ML Detection",
-        "description": "Isolation Forest ensembles detect anomalies that traditional rule-based systems miss."
+        "description": "Advanced anomaly detection with AI to identify suspicious patterns that traditional rule-based systems miss."
       },
       {
         "icon": "BarChart3",
         "title": "Real-time Analytics",
         "description": "Visualize complex transaction webs and identify layered money movements instantly."
-      },
-      {
-        "icon": "Database",
-        "title": "Secure Data Vault",
-        "description": "Military-grade encryption for sensitive forensic reports and evidence logs."
       },
       {
         "icon": "Lock",
@@ -49,33 +45,34 @@
   },
   "trust": {
     "title": "Global Standards. Local Precision.",
-    "description": "GAFA monitors over $50B in transaction volume through our partner networks, ensuring that financial ecosystems remain transparent and secure."
+    "description": "GAFA engages with partner networks collectively handling significant transaction volumes, supporting transparency and stronger financial oversight practices."
   },
   "faq": {
     "title": "Frequently Asked Questions",
     "subtitle": "Everything you need to know about the GAFA platform.",
     "items": [
       {
-        "question": "Who is this platform built for?",
-        "answer": "It is designed exclusively for certified forensic accountants, AML compliance officers at financial institutions, and students enrolled in GAFA certification programs."
+        "question": "Who is this platform designed for?",
+        "answer": "It is built for students and professionals enrolled in GAFA's CAML program, especially those in banking, compliance, audit, and financial investigation roles."
       },
       {
-        "question": "How does the AI detection work?",
-        "answer": "We utilize an Isolation Forest Ensemble trained on vast, anonymized global transaction datasets. It identifies complex patterns of layering and geographic anomalies that trigger risk alerts before human auditors even look at the data."
+        "question": "How does the detection work?",
+        "answer": "The platform combines rule-based scenarios with basic machine learning models to simulate real transaction monitoring, helping learners identify suspicious patterns and risk indicators."
       },
       {
-        "question": "Is my forensic data secure?",
-        "answer": "Absolutely. All data ingested for investigation is processed using AES-256 encryption. We comply with strict data residency laws and automatically scrub PII during bulk AI inference tasks."
+        "question": "Is the data secure?",
+        "answer": "Yes. The platform uses simulated and anonymized data with strong security controls, ensuring a safe training environment without real customer exposure."
       },
       {
-        "question": "Can I test the platform?",
-        "answer": "If you are a registered user, you can use the 'Student Portal' login role to access isolated sandbox environments filled with generated mock financial records for training purposes."
+        "question": "Can learners practice on the platform?",
+        "answer": "Yes. A sandbox environment allows users to analyze mock transactions, generate alerts, and perform investigations in a risk-free setting."
       }
     ]
   },
   "footer": {
-    "brandDescription": "Pioneering the future of forensic financial analysis with intelligent, real-time threat detection and comprehensive global compliance.",
-    "location": "GAFA HQ, Mumbai, India",
-    "phone": "+91 (22) 1234 5678"
+    "brandDescription": "Advancing forensic financial analysis through intelligent monitoring, real-time risk detection, and globally aligned compliance standards.",
+    "email": "info@gafa.org.in",
+    "website": "www.gafa.org.in",
+    "copyright": "Global Association of Forensic Accountants"
   }
 }
