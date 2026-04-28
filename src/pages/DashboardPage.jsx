@@ -9,6 +9,7 @@ export default function DashboardPage() {
   const [alerts, setAlerts] = useState([]);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     loadDashboard();
@@ -65,7 +66,8 @@ export default function DashboardPage() {
       
       setStudents(studentData);
     } catch (err) {
-      // Silently handle errors for dashboard
+      console.error('[Dashboard] API error:', err);
+      setError(err.message || 'Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
@@ -138,6 +140,37 @@ export default function DashboardPage() {
         </h1>
         <p>Overview of key metrics, alerts, and compliance status</p>
       </div>
+
+      {error && (
+        <div style={{
+          background: 'rgba(244, 63, 94, 0.1)',
+          border: '1px solid rgba(244, 63, 94, 0.3)',
+          borderRadius: '8px',
+          padding: '1rem 1.5rem',
+          marginBottom: '1.5rem',
+          color: '#fda4af',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <span>⚠️ Dashboard failed to load: {error}</span>
+          <button
+            onClick={() => { setError(null); loadDashboard(); }}
+            style={{
+              background: 'rgba(244, 63, 94, 0.2)',
+              border: '1px solid rgba(244, 63, 94, 0.4)',
+              color: '#fda4af',
+              padding: '0.4rem 1rem',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              fontSize: '0.85rem'
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="kpi-grid">

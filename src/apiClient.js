@@ -4,6 +4,7 @@
 // ============================================================
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+console.log('[GAFA] API_BASE =', API_BASE);
 
 const TOKEN_KEY = 'gafa_auth_token';
 
