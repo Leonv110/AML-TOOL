@@ -205,16 +205,16 @@ router.post('/manual-screen', authenticateToken, screeningLimiter, async (req, r
   }
 });
 
-// DELETE /api/customers — delete all customers and related data
+// DELETE /api/customers — delete current user's customers and related data
 router.delete('/', authenticateToken, async (req, res) => {
   try {
-    // Cascading delete: all related data
-    await pool.query('DELETE FROM notes');
-    await pool.query('DELETE FROM documents');
-    await pool.query('DELETE FROM investigations');
-    await pool.query('DELETE FROM alerts');
-    await pool.query('DELETE FROM transactions');
-    const result = await pool.query('DELETE FROM customers');
+    const userId = req.user.id;
+    await pool.query('DELETE FROM notes WHERE created_by = $1', [userId]);
+    await pool.query('DELETE FROM documents WHERE uploaded_by = $1', [userId]);
+    await pool.query('DELETE FROM investigations WHERE created_by = $1', [userId]);
+    await pool.query('DELETE FROM alerts WHERE uploaded_by = $1', [userId]);
+    await pool.query('DELETE FROM transactions WHERE uploaded_by = $1', [userId]);
+    const result = await pool.query('DELETE FROM customers WHERE uploaded_by = $1', [userId]);
     res.json({ deleted: result.rowCount });
   } catch (err) {
     console.error('Delete customers error:', err);

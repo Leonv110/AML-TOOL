@@ -350,10 +350,9 @@ router.post('/', authenticateToken, async (req, res) => {
  */
 router.delete('/', authenticateToken, async (req, res) => {
   try {
-    // Delete alerts first (FK dependency)
-    const alertResult = await pool.query('DELETE FROM alerts');
-    // Then delete transactions
-    const txnResult = await pool.query('DELETE FROM transactions');
+    const userId = req.user.id;
+    const alertResult = await pool.query('DELETE FROM alerts WHERE uploaded_by = $1', [userId]);
+    const txnResult = await pool.query('DELETE FROM transactions WHERE uploaded_by = $1', [userId]);
     res.json({ deleted_transactions: txnResult.rowCount, deleted_alerts: alertResult.rowCount });
   } catch (err) {
     console.error('Delete transactions error:', err);

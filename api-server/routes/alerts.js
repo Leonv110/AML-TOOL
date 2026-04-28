@@ -233,7 +233,7 @@ router.post('/', authenticateToken, async (req, res) => {
  */
 router.delete('/', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query('DELETE FROM alerts');
+    const result = await pool.query('DELETE FROM alerts WHERE uploaded_by = $1', [req.user.id]);
     console.log(`[Reset] Deleted ${result.rowCount} alerts (user: ${req.user.email})`);
     res.json({ deleted: result.rowCount });
   } catch (err) {
