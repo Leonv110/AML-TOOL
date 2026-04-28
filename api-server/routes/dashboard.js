@@ -47,7 +47,7 @@ router.get('/counts', authenticateToken, async (req, res) => {
   try {
     const [custRes, highRiskRes, alertRes, sarRes] = await Promise.all([
       pool.query('SELECT COUNT(*) as count FROM customers'),
-      pool.query("SELECT COUNT(*) as count FROM customers WHERE pep_flag = true"),
+      pool.query("SELECT COUNT(DISTINCT customer_id) as count FROM alerts WHERE risk_level IN ('HIGH', 'CRITICAL')"),
       pool.query("SELECT COUNT(*) as count FROM alerts WHERE status = 'open'"),
       pool.query("SELECT COUNT(*) as count FROM investigations WHERE status = 'draft_sar'"),
     ]);
