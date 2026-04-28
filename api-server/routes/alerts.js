@@ -233,18 +233,7 @@ router.post('/', authenticateToken, async (req, res) => {
  */
 router.delete('/', authenticateToken, async (req, res) => {
   try {
-    const isAdmin = req.user.role === 'admin';
-    let query, params;
-
-    if (isAdmin) {
-      query = 'DELETE FROM alerts';
-      params = [];
-    } else {
-      query = 'DELETE FROM alerts WHERE (uploaded_by = $1 OR uploaded_by IS NULL)';
-      params = [req.user.id];
-    }
-
-    const result = await pool.query(query, params);
+    const result = await pool.query('DELETE FROM alerts');
     console.log(`[Reset] Deleted ${result.rowCount} alerts (user: ${req.user.email})`);
     res.json({ deleted: result.rowCount });
   } catch (err) {
