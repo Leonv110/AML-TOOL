@@ -6,12 +6,11 @@ const { amlWatcherRequest } = require('../services/amlWatcherService');
 
 const router = express.Router();
 
-// GET /api/customers — fetch current user's customers
+// GET /api/customers — fetch all customers
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      'SELECT * FROM customers WHERE (uploaded_by = $1 OR uploaded_by IS NULL) ORDER BY created_at DESC',
-      [req.user.id]
+      'SELECT * FROM customers ORDER BY created_at DESC'
     );
     res.json(rows);
   } catch (err) {
@@ -20,13 +19,10 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-// GET /api/customers/count — count current user's customers
+// GET /api/customers/count — count all customers
 router.get('/count', authenticateToken, async (req, res) => {
   try {
-    const { rows } = await pool.query(
-      'SELECT COUNT(*) FROM customers WHERE (uploaded_by = $1 OR uploaded_by IS NULL)',
-      [req.user.id]
-    );
+    const { rows } = await pool.query('SELECT COUNT(*) FROM customers');
     res.json({ count: parseInt(rows[0].count) });
   } catch (err) {
     console.error('Count customers error:', err);
@@ -34,12 +30,11 @@ router.get('/count', authenticateToken, async (req, res) => {
   }
 });
 
-// GET /api/customers/countries — distinct countries for current user
+// GET /api/customers/countries — distinct countries
 router.get('/countries', authenticateToken, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      'SELECT DISTINCT country FROM customers WHERE country IS NOT NULL AND (uploaded_by = $1 OR uploaded_by IS NULL) ORDER BY country',
-      [req.user.id]
+      'SELECT DISTINCT country FROM customers WHERE country IS NOT NULL ORDER BY country'
     );
     res.json(rows.map(r => r.country));
   } catch (err) {
@@ -48,12 +43,12 @@ router.get('/countries', authenticateToken, async (req, res) => {
   }
 });
 
-// GET /api/customers/:customerId — fetch single customer (user-scoped)
+// GET /api/customers/:customerId — fetch single customer
 router.get('/:customerId', authenticateToken, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      'SELECT * FROM customers WHERE customer_id = $1 AND (uploaded_by = $2 OR uploaded_by IS NULL)',
-      [req.params.customerId, req.user.id]
+      'SELECT * FROM customers WHERE customer_id = $1',
+      [req.params.customerId]
     );
     res.json(rows[0] || null);
   } catch (err) {
@@ -101,13 +96,13 @@ router.put('/upsert', authenticateToken, async (req, res) => {
   }
 });
 
-// PATCH /api/customers/:customerId/pep — update PEP flag (user-scoped)
+// PATCH /api/customers/:customerId/pep — update PEP flag
 router.patch('/:customerId/pep', authenticateToken, async (req, res) => {
   try {
     const { pep_flag } = req.body;
     await pool.query(
-      'UPDATE customers SET pep_flag = $1 WHERE customer_id = $2 AND (uploaded_by = $3 OR uploaded_by IS NULL)',
-      [pep_flag, req.params.customerId, req.user.id]
+      'UPDATE customers SET pep_flag = $1 WHERE customer_id = $2',
+      [pep_flag, req.params.customerId]
     );
     res.json({ success: true });
   } catch (err) {
@@ -120,8 +115,8 @@ router.patch('/:customerId/pep', authenticateToken, async (req, res) => {
 router.post('/:customerId/screen', authenticateToken, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      'SELECT * FROM customers WHERE customer_id = $1 AND (uploaded_by = $2 OR uploaded_by IS NULL)',
-      [req.params.customerId, req.user.id]
+      'SELECT * FROM customers WHERE customer_id = $1',
+      [req.params.customerId]
     );
     const customer = rows[0];
 

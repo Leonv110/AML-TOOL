@@ -47,20 +47,9 @@ router.get('/', authenticateToken, async (req, res) => {
     const { startDate, endDate, minAmount, maxAmount, country, rule, page } = req.query;
     const limit = Math.min(parseInt(req.query.limit) || 500, 50000);
     const offset = ((parseInt(page) || 1) - 1) * limit;
-    const userId = req.user.id;
-    const isAdmin = req.user.role === 'admin';
-
-    // Admins see all data; other roles see only their own uploads
-    let query, params, idx;
-    if (isAdmin) {
-      query = 'SELECT * FROM transactions WHERE 1=1';
-      params = [];
-      idx = 1;
-    } else {
-      query = 'SELECT * FROM transactions WHERE (uploaded_by = $1 OR uploaded_by IS NULL)';
-      params = [userId];
-      idx = 2;
-    }
+    let query = 'SELECT * FROM transactions WHERE 1=1';
+    const params = [];
+    let idx = 1;
 
     if (startDate) { query += ` AND transaction_date >= $${idx++}`; params.push(startDate); }
     if (endDate) { query += ` AND transaction_date <= $${idx++}`; params.push(endDate); }
@@ -92,16 +81,7 @@ router.get('/', authenticateToken, async (req, res) => {
  */
 router.get('/count', authenticateToken, async (req, res) => {
   try {
-    const isAdmin = req.user.role === 'admin';
-    let query, params;
-    if (isAdmin) {
-      query = 'SELECT COUNT(*) FROM transactions';
-      params = [];
-    } else {
-      query = 'SELECT COUNT(*) FROM transactions WHERE (uploaded_by = $1 OR uploaded_by IS NULL)';
-      params = [req.user.id];
-    }
-    const { rows } = await pool.query(query, params);
+    const { rows } = await pool.query('SELECT COUNT(*) FROM transactions');
     res.json({ count: parseInt(rows[0].count) });
   } catch (err) {
     console.error('Count transactions error:', err);
@@ -164,16 +144,7 @@ router.patch('/flag', authenticateToken, async (req, res) => {
       const idPlaceholders = ids.map(() => `$${pIdx++}`);
       params.push(...ids);
 
-      const isAdmin = req.user.role === 'admin';
-      let whereClause;
-      if (isAdmin) {
-        whereClause = `WHERE transaction_id IN (${idPlaceholders.join(', ')})`;
-      } else {
-        params.push(req.user.id);
-        const userFilter = `$${pIdx++}`;
-        whereClause = `WHERE transaction_id IN (${idPlaceholders.join(', ')})
-          AND (uploaded_by = ${userFilter} OR uploaded_by IS NULL)`;
-      }
+      const whereClause = `WHERE transaction_id IN (${idPlaceholders.join(', ')})`;
 
       const query = `
         UPDATE transactions SET

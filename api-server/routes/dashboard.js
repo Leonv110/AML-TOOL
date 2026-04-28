@@ -4,17 +4,12 @@ const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
-// GET /api/dashboard/kpis — aggregated dashboard stats (user-scoped)
+// GET /api/dashboard/kpis — aggregated dashboard stats
 router.get('/kpis', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id;
-    const isAdmin = req.user.role === 'admin';
-    const userFilter = isAdmin ? '1=1' : '(uploaded_by = $1 OR uploaded_by IS NULL)';
-    const params = isAdmin ? [] : [userId];
-
     const [custRes, alertRes, sarRes] = await Promise.all([
-      pool.query(`SELECT COUNT(*) as count FROM customers WHERE ${userFilter}`, params),
-      pool.query(`SELECT COUNT(*) as count FROM alerts WHERE status = 'open' AND ${userFilter}`, params),
+      pool.query('SELECT COUNT(*) as count FROM customers'),
+      pool.query("SELECT COUNT(*) as count FROM alerts WHERE status = 'open'"),
       pool.query("SELECT COUNT(*) as count FROM investigations WHERE status = 'draft_sar'"),
     ]);
 
@@ -32,13 +27,8 @@ router.get('/kpis', authenticateToken, async (req, res) => {
 // GET /api/dashboard/analyst-stats — analyst performance data
 router.get('/analyst-stats', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id;
-    const isAdmin = req.user.role === 'admin';
-    const userFilter = isAdmin ? '1=1' : '(uploaded_by = $1 OR uploaded_by IS NULL)';
-    const params = isAdmin ? [] : [userId];
-
     const [alertsRes, investigationsRes] = await Promise.all([
-      pool.query(`SELECT assigned_to, status, created_at, updated_at FROM alerts WHERE status != 'open' AND ${userFilter}`, params),
+      pool.query("SELECT assigned_to, status, created_at, updated_at FROM alerts WHERE status != 'open'"),
       pool.query('SELECT assigned_to, status FROM investigations'),
     ]);
 
@@ -52,19 +42,13 @@ router.get('/analyst-stats', authenticateToken, async (req, res) => {
   }
 });
 
-// GET /api/dashboard/counts — individual table counts (admin sees all, others see own data)
+// GET /api/dashboard/counts — individual table counts
 router.get('/counts', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.id;
-    const isAdmin = req.user.role === 'admin';
-    const userFilter = isAdmin ? '1=1' : '(uploaded_by = $1 OR uploaded_by IS NULL)';
-    const params = isAdmin ? [] : [userId];
-    const p = (i) => isAdmin ? `$${i}` : `$${i + 1}`;
-
     const [custRes, highRiskRes, alertRes, sarRes] = await Promise.all([
-      pool.query(`SELECT COUNT(*) as count FROM customers WHERE ${userFilter}`, params),
-      pool.query(`SELECT COUNT(*) as count FROM customers WHERE pep_flag = true AND ${userFilter}`, params),
-      pool.query(`SELECT COUNT(*) as count FROM alerts WHERE status = 'open' AND ${userFilter}`, params),
+      pool.query('SELECT COUNT(*) as count FROM customers'),
+      pool.query("SELECT COUNT(*) as count FROM customers WHERE pep_flag = true"),
+      pool.query("SELECT COUNT(*) as count FROM alerts WHERE status = 'open'"),
       pool.query("SELECT COUNT(*) as count FROM investigations WHERE status = 'draft_sar'"),
     ]);
 
