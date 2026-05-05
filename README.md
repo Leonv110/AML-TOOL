@@ -7,7 +7,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-18+-339933?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-4169E1?style=flat-square&logo=postgresql&logoColor=white)](https://neon.tech)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supabase-3FCF8E?style=flat-square&logo=supabase&logoColor=white)](https://supabase.com)
 [![License](https://img.shields.io/badge/License-Academic-f59e0b?style=flat-square)]()
 
 <br/>
@@ -102,7 +102,7 @@ A full-stack AML compliance platform combining **rule-based detection**, **machi
 └──────────────────┬──────────────┘  └─────┬──────────────────┘
                    │ SQL (pg)              │ psycopg2
                ┌───▼──────────────────────▼───┐
-               │     POSTGRESQL (Neon)         │
+               │   POSTGRESQL (Supabase)       │
                │                               │
                │  users · profiles · customers │
                │  transactions · alerts · rules│
@@ -117,7 +117,7 @@ A full-stack AML compliance platform combining **rule-based detection**, **machi
 | **Frontend** | React 19, Vite 6, Recharts, jsPDF | UI, client-side HMAC, PDF generation |
 | **API Server** | Node.js, Express, JWT, Helmet, Swagger | REST API, auth, CRUD, audit analytics |
 | **ML Backend** | Python 3, FastAPI, scikit-learn, NetworkX, SHAP | AML rule processing, anomaly detection |
-| **Database** | PostgreSQL (Neon), 12 tables, 5 indexes on audit | Persistent storage with append-only audit trail |
+| **Database** | PostgreSQL (Supabase), 12 tables, 5 indexes on audit | Persistent storage with append-only audit trail |
 | **Deployment** | Vercel (frontend), Render (API + ML) | Auto-deploy on push |
 
 ---
@@ -195,7 +195,7 @@ One-click PDF generation for regulatory submission under PMLA Section 12:
 
 - **Node.js** 18+
 - **Python** 3.10+
-- **PostgreSQL** database ([Neon](https://neon.tech) free tier works)
+- **PostgreSQL** database ([Supabase](https://supabase.com) free tier works)
 
 ### 1. Clone & Install
 
@@ -241,7 +241,7 @@ ADMIN_PASSWORD=YourStrongPass1
 
 ### 3. Database Setup
 
-Run the schema in your PostgreSQL instance (Neon SQL Editor):
+Run the schema in your PostgreSQL instance (Supabase SQL Editor):
 
 ```bash
 # Full schema (new database)
@@ -404,7 +404,7 @@ Key design decisions:
 | Frontend | **Vercel** | Auto-deploy from `main`. SPA routing via `vercel.json` |
 | API Server | **Render** | Web service, `node server.js`, env vars in dashboard |
 | ML Backend | **Render** | Web service, `uvicorn main:app --host 0.0.0.0 --port 8000` |
-| Database | **Neon** | Free PostgreSQL, connection string in env |
+| Database | **Supabase** | Free PostgreSQL, connection string in env |
 
 ```bash
 # Build for production
@@ -456,7 +456,7 @@ This platform implements controls mapped to:
 | Backend Framework | Express.js 4 |
 | ML Framework | FastAPI |
 | ML Libraries | scikit-learn, NetworkX, SHAP, pandas |
-| Database | PostgreSQL (Neon) |
+| Database | PostgreSQL (Supabase) |
 | Authentication | JWT (jsonwebtoken) |
 | API Documentation | Swagger UI (swagger-jsdoc) |
 | Cryptography | Web Crypto API (client), Node crypto (server) |
