@@ -6,17 +6,82 @@ const { amlWatcherRequest } = require('../services/amlWatcherService');
 
 const router = express.Router();
 
-// GET /api/customers — fetch current user's customers
+// GET /api/customers — fetch current user's customers with dynamically computed risk_tier
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      'SELECT * FROM customers WHERE (uploaded_by = $1 OR uploaded_by IS NULL) ORDER BY created_at DESC',
+      `WITH txn_stats AS (
+        SELECT 
+          customer_id,
+          COALESCE(MAX(CAST(risk_score AS numeric)), 0) as max_score,
+          COUNT(*) as flagged_count
+        FROM transactions 
+        WHERE flagged = true AND (uploaded_by = $1 OR uploaded_by IS NULL)
+        GROUP BY customer_id
+      ),
+      customer_scores AS (
+        SELECT c.*,
+          LEAST(
+            LEAST(ROUND(COALESCE(ts.max_score, 0) / 100.0 * 35), 35) +
+            CASE 
+              WHEN COALESCE(ts.flagged_count, 0) >= 10 THEN 15
+              WHEN COALESCE(ts.flagged_count, 0) >= 5 THEN 10
+              WHEN COALESCE(ts.flagged_count, 0) >= 2 THEN 6
+              WHEN COALESCE(ts.flagged_count, 0) >= 1 THEN 3
+              ELSE 0
+            END,
+            50
+          ) as txn_risk,
+          LEAST(
+            CASE WHEN c.pep_flag = true THEN 30 ELSE 0 END +
+            CASE WHEN LOWER(c.occupation) LIKE '%hni%' THEN 15 ELSE 0 END +
+            CASE WHEN LOWER(c.occupation) LIKE '%crypto%' OR LOWER(c.occupation) LIKE '%exchange%' THEN 25 ELSE 0 END,
+            50
+          ) as screen_risk
+        FROM customers c
+        LEFT JOIN txn_stats ts ON ts.customer_id = c.customer_id
+        WHERE (c.uploaded_by = $1 OR c.uploaded_by IS NULL)
+      )
+      SELECT cs.*,
+        (cs.txn_risk + cs.screen_risk) as risk_score_computed,
+        CASE 
+          WHEN cs.txn_risk + cs.screen_risk >= 50 THEN 'CRITICAL'
+          WHEN cs.txn_risk + cs.screen_risk >= 35 THEN 'HIGH'
+          WHEN cs.txn_risk + cs.screen_risk >= 25 THEN 'MEDIUM'
+          ELSE 'LOW'
+        END as risk_tier
+      FROM customer_scores cs
+      ORDER BY (cs.txn_risk + cs.screen_risk) DESC, cs.created_at DESC`,
       [req.user.id]
     );
     res.json(rows);
   } catch (err) {
     console.error('Fetch customers error:', err);
     res.status(500).json({ error: 'Failed to fetch customers' });
+  }
+});
+
+// PATCH /api/customers/update-risk-tiers — bulk update customer risk tiers after AML processing
+router.patch('/update-risk-tiers', authenticateToken, async (req, res) => {
+  try {
+    const updates = req.body; // Array of { customer_id, risk_tier, risk_score }
+    if (!Array.isArray(updates) || updates.length === 0) {
+      return res.status(400).json({ error: 'Array of updates required' });
+    }
+
+    let updated = 0;
+    for (const u of updates) {
+      const result = await pool.query(
+        'UPDATE customers SET risk_tier = $1 WHERE customer_id = $2',
+        [u.risk_tier, u.customer_id]
+      );
+      updated += result.rowCount;
+    }
+
+    res.json({ updated });
+  } catch (err) {
+    console.error('Update risk tiers error:', err);
+    res.status(500).json({ error: 'Failed to update risk tiers' });
   }
 });
 
@@ -214,13 +279,26 @@ router.post('/manual-screen', authenticateToken, screeningLimiter, async (req, r
 router.delete('/', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
-    // Cascading delete: only user's data
-    await pool.query('DELETE FROM notes WHERE created_by = $1', [userId]);
-    await pool.query('DELETE FROM documents WHERE uploaded_by = $1', [userId]);
-    await pool.query('DELETE FROM investigations WHERE created_by = $1 OR created_by IS NULL', [userId]);
-    await pool.query('DELETE FROM alerts WHERE uploaded_by = $1', [userId]);
-    await pool.query('DELETE FROM transactions WHERE uploaded_by = $1', [userId]);
-    const result = await pool.query('DELETE FROM customers WHERE uploaded_by = $1', [userId]);
+    const isAdmin = req.user.role === 'admin';
+    let result;
+    
+    if (isAdmin) {
+      await pool.query('DELETE FROM notes');
+      await pool.query('DELETE FROM documents');
+      await pool.query('DELETE FROM investigations');
+      await pool.query('DELETE FROM alerts');
+      await pool.query('DELETE FROM transactions');
+      result = await pool.query('DELETE FROM customers');
+    } else {
+      // Cascading delete: only user's data
+      await pool.query('DELETE FROM notes WHERE created_by = $1', [userId]);
+      await pool.query('DELETE FROM documents WHERE uploaded_by = $1', [userId]);
+      await pool.query('DELETE FROM investigations WHERE created_by = $1 OR created_by IS NULL', [userId]);
+      await pool.query('DELETE FROM alerts WHERE uploaded_by = $1', [userId]);
+      await pool.query('DELETE FROM transactions WHERE uploaded_by = $1', [userId]);
+      result = await pool.query('DELETE FROM customers WHERE uploaded_by = $1', [userId]);
+    }
+    
     res.json({ deleted: result.rowCount });
   } catch (err) {
     console.error('Delete customers error:', err);

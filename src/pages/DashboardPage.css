@@ -1,0 +1,222 @@
+/* ============================================================
+   DashboardPage.css — Styles for the Analytics Dashboard
+   ============================================================ */
+
+/* ── Summary Cards ────────────────────────────────────────── */
+.db-skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.db-summary-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  cursor: default;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.db-summary-card[role='button'] {
+  cursor: pointer;
+}
+
+.db-summary-card[role='button']:hover {
+  border-color: var(--card-accent, #f59e0b);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+}
+
+/* Accent top bar */
+.db-summary-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--card-accent, #f59e0b);
+  border-radius: 14px 14px 0 0;
+}
+
+.db-card-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.db-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.db-card-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+}
+
+.db-card-value {
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.db-card-sub {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 0.1rem;
+}
+
+/* ── Layout Rows ──────────────────────────────────────────── */
+.db-row {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.db-row-60-40 {
+  grid-template-columns: 3fr 2fr;
+}
+
+.db-row-50-50 {
+  grid-template-columns: 1fr 1fr;
+}
+
+/* ── Chart Cards ──────────────────────────────────────────── */
+.db-chart-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 1.25rem 1.25rem 1rem;
+}
+
+.db-chart-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-secondary);
+  font-weight: 600;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.db-chart-note {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  margin-top: 0.5rem;
+  font-style: italic;
+  text-align: center;
+}
+
+/* ── Donut Pair ───────────────────────────────────────────── */
+.db-donuts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.db-donut-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.db-donut-label {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  text-align: center;
+  margin-bottom: 0.25rem;
+  font-weight: 500;
+}
+
+/* ── Legends ──────────────────────────────────────────────── */
+.db-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: 0.5rem;
+  width: 100%;
+  padding: 0 0.25rem;
+}
+
+.db-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+}
+
+.db-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Tooltip ──────────────────────────────────────────────── */
+.db-tooltip {
+  background: #0d1117;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+}
+
+.db-tooltip-label {
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+}
+
+.db-tooltip p {
+  color: var(--text-secondary);
+  margin: 0.15rem 0;
+}
+
+/* ── Recharts overrides ───────────────────────────────────── */
+.recharts-default-legend .recharts-legend-item-text {
+  font-size: 11px !important;
+  color: #94a3b8 !important;
+}
+
+/* ── Responsive ───────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .db-row-60-40,
+  .db-row-50-50 {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .db-skeleton-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .db-donuts-row {
+    grid-template-columns: 1fr;
+  }
+
+  .db-card-value {
+    font-size: 1.5rem;
+  }
+}

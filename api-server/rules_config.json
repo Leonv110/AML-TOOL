@@ -1,0 +1,45 @@
+{
+  "_comment": "GAFA AML Rule Engine — Configurable Thresholds. Change values here, restart the server for changes to take effect.",
+
+  "INCOME_MISMATCH": {
+    "RSF_HIGH_THRESHOLD": 5,
+    "_comment_rsf": "RSF = (|TotalCredits - TotalDebits| for month) / Stated Monthly Income. Flag HIGH if RSF > this value.",
+    "RSF_MEDIUM_THRESHOLD": 3,
+    "_comment_rsf_med": "Flag MEDIUM if RSF is between RSF_MEDIUM_THRESHOLD and RSF_HIGH_THRESHOLD.",
+    "LOOKBACK_DAYS": 30
+  },
+
+  "TRANSACTION_VELOCITY": {
+    "SPIKE_MULTIPLIER": 5,
+    "_comment_spike": "Flag if current-month count > SPIKE_MULTIPLIER x historical average count.",
+    "BASELINE_MONTHS": 3,
+    "_comment_baseline": "Number of prior months used to compute the historical average count.",
+    "MIN_COUNT_TO_TRIGGER": 20,
+    "_comment_min": "Minimum transaction count in current month before velocity rule activates (avoids false positives on new accounts)."
+  },
+
+  "GEOGRAPHIC_RISK": {
+    "HIGH_RISK_COUNTRIES": ["iran", "north korea", "myanmar", "syria", "yemen", "afghanistan", "iraq", "libya", "somalia", "south sudan"],
+    "MEDIUM_RISK_COUNTRIES": ["uae", "pakistan", "russia", "turkey", "lebanon", "haiti", "panama", "nigeria", "mali"],
+    "HIGH_VALUE_AMOUNT_THRESHOLD": 15000
+  },
+
+  "STRUCTURING": {
+    "CTR_LIMIT": 1000000,
+    "LOWER_BAND": 50000,
+    "MIN_TRANSACTIONS_TO_FLAG": 2,
+    "LOOKBACK_DAYS": 30
+  },
+
+  "TIME_ANOMALY": {
+    "ENABLED": true,
+    "ODD_HOUR_START_IST": 0,
+    "ODD_HOUR_END_IST": 5,
+    "_comment": "Transactions between ODD_HOUR_START_IST and ODD_HOUR_END_IST (Indian Standard Time, 24h) are considered anomalous."
+  },
+
+  "SCORING": {
+    "HIGH_THRESHOLD": 50,
+    "MEDIUM_THRESHOLD": 25
+  }
+}

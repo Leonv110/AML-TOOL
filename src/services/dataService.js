@@ -1,63 +1,104 @@
 import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '../apiClient';
 
 // ============================================================
+// Rule Engine Config — mirrors api-server/rules_config.json
+// These are defaults; the backend config is the authoritative source.
+// ============================================================
+const RULE_CFG = {
+  INCOME_MISMATCH: { RSF_HIGH_THRESHOLD: 5, RSF_MEDIUM_THRESHOLD: 3, LOOKBACK_DAYS: 30 },
+  TRANSACTION_VELOCITY: { SPIKE_MULTIPLIER: 5, BASELINE_MONTHS: 3, MIN_COUNT_TO_TRIGGER: 20 },
+  SCORING: { HIGH_THRESHOLD: 50, MEDIUM_THRESHOLD: 25 },
+};
+
+// ============================================================
 // computeRiskScore — Core risk scoring function (pure, no DB)
 // ============================================================
-export function computeRiskScore(customer, transactions = []) {
-  let income_mismatch = 0;
-  let crypto_risk = 0;
-  let profile_risk = 0;
+export function computeRiskScore(customer, transactions = [], screeningResult = null) {
+  let transaction_risk = 0;
+  let screening_risk = 0;
   const rules_triggered = [];
 
-  // 1. Profile Risk (PEP / HNI)
-  if (customer.pep_flag) {
-    profile_risk += 50;
-    rules_triggered.push('PEP Flag');
-  }
-  if (customer.hni_flag || customer.occupation?.toLowerCase().includes('hni')) {
-    profile_risk += 30;
-    rules_triggered.push('HNI Status');
-  }
-
-  // 2. Crypto
-  if (customer.crypto_flag || customer.occupation?.toLowerCase().includes('crypto') || customer.occupation?.toLowerCase().includes('exchange')) {
-    crypto_risk = 50;
-    rules_triggered.push('Cryptocurrency Dealings');
-  }
-
-  // 3. Income Mismatch
-  const monthlyIncome = parseFloat(customer.income) || 0;
-  if (monthlyIncome > 0 && transactions.length > 0) {
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const recentTxns = transactions.filter(t => {
-      const txDate = new Date(t.transaction_date);
-      return txDate >= thirtyDaysAgo;
-    });
-    const txnSum = recentTxns.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
-
-    if (txnSum > 5 * monthlyIncome) {
-      income_mismatch = 50;
-      rules_triggered.push('Income Mismatch (>5x)');
-    } else if (txnSum > 3 * monthlyIncome) {
-      income_mismatch = 25;
-      rules_triggered.push('Income Mismatch (>3x)');
+  // 1. Screening Risk (Max 50)
+  if (screeningResult) {
+    if (screeningResult.match === 'Match') {
+      screening_risk += 50;
+      rules_triggered.push(`Screening: Confirmed Match (${screeningResult.score}%)`);
+    } else if (screeningResult.match === 'Possible Match') {
+      screening_risk += 30;
+      rules_triggered.push(`Screening: Possible Match (${screeningResult.score}%)`);
     }
   }
 
-  const score = Math.min(income_mismatch + crypto_risk + profile_risk, 100);
+  // Add baseline profile risks to screening risk if screening API wasn't conclusive
+  if (customer.pep_flag) {
+    screening_risk += 30;
+    rules_triggered.push('PEP Flag');
+  }
+  if (customer.hni_flag || customer.occupation?.toLowerCase().includes('hni')) {
+    screening_risk += 15;
+    rules_triggered.push('HNI Status');
+  }
+  if (customer.crypto_flag || customer.occupation?.toLowerCase().includes('crypto') || customer.occupation?.toLowerCase().includes('exchange')) {
+    screening_risk += 25;
+    rules_triggered.push('Cryptocurrency Dealings');
+  }
+  screening_risk = Math.min(screening_risk, 50);
+
+  // 2. Transactions Risk (Max 50) — Two components:
+  //    A) Severity (max 35pts): Based on the HIGHEST risk score among flagged transactions
+  //       → Scaled from 0-100 transaction score to 0-35 points
+  //    B) Frequency (max 15pts): Based on HOW MANY transactions were flagged
+  //       → 1 flagged = 3pts, 2-4 = 6pts, 5-9 = 10pts, 10+ = 15pts
+  //    Total = Severity + Frequency, capped at 50
+  let max_txn_score = 0;
+  let flagged_count = 0;
+  let avg_txn_score = 0;
+  if (transactions && transactions.length > 0) {
+    const flaggedTxns = transactions.filter(t => 
+      (t.flagged === true || t.flagged === 'true') && t.risk_score
+    );
+    flagged_count = flaggedTxns.length;
+    if (flagged_count > 0) {
+      const scores = flaggedTxns.map(t => parseFloat(t.risk_score));
+      max_txn_score = Math.max(...scores);
+      avg_txn_score = scores.reduce((a, b) => a + b, 0) / scores.length;
+    }
+  }
+  
+  // A) Severity component: max score scaled to 35 points
+  const severity = Math.min(Math.round((max_txn_score / 100) * 35), 35);
+  
+  // B) Frequency component: number of flagged txns scaled to 15 points
+  let frequency = 0;
+  if (flagged_count >= 10) frequency = 15;
+  else if (flagged_count >= 5) frequency = 10;
+  else if (flagged_count >= 2) frequency = 6;
+  else if (flagged_count >= 1) frequency = 3;
+  
+  transaction_risk = Math.min(severity + frequency, 50);
+  
+  if (transaction_risk > 0) {
+    rules_triggered.push(
+      `Transaction Risk: Severity ${severity}/35 (max alert score: ${max_txn_score}) + Frequency ${frequency}/15 (${flagged_count} flagged txn${flagged_count !== 1 ? 's' : ''})`
+    );
+  }
+
+  const score = Math.min(transaction_risk + screening_risk, 100);
 
   let tier = 'LOW';
-  if (score >= 66) tier = 'HIGH';
-  else if (score >= 31) tier = 'MEDIUM';
+  if (score >= 50) tier = 'CRITICAL';
+  else if (score >= 35) tier = 'HIGH';
+  else if (score >= 25) tier = 'MEDIUM';
 
   return {
     score,
     tier,
     breakdown: {
-      profile_risk,
-      crypto_risk,
-      income_mismatch,
+      transaction_risk,
+      screening_risk,
+      severity,
+      frequency,
+      flagged_count,
     },
     rules_triggered: [...new Set(rules_triggered)],
   };
@@ -253,19 +294,19 @@ export function applyAMLRules(transaction, activeRuleNames, contextTxns = []) {
   const medRiskCountries = ['uae', 'pakistan', 'russia', 'turkey', 'lebanon', 'haiti', 'panama', 'nigeria', 'mali'];
   const country = (transaction.country || '').toLowerCase().trim();
   const riskLevel = (transaction.country_risk_level || '').toLowerCase();
-  
+
   if (activeRuleNames.has('Geographic Risk')) {
     if (highRiskCountries.includes(country) || riskLevel === 'high') {
       if (amount > 15000) {
         score += 35; // Critical flag
-        triggered_rules.push('Geographic Risk (High-Risk Country + Significant Value)');
+        triggered_rules.push('Geographic Risk (+35: High-Risk Country + Significant Value)');
       } else {
-        score += 25; 
-        triggered_rules.push('Geographic Risk');
+        score += 25;
+        triggered_rules.push('Geographic Risk (+25: High-Risk Country)');
       }
     } else if (medRiskCountries.includes(country) || riskLevel === 'medium') {
-      score += 15; 
-      triggered_rules.push('Geographic Risk (Medium)');
+      score += 15;
+      triggered_rules.push('Geographic Risk (+15: Medium-Risk Country)');
     }
   }
 
@@ -273,7 +314,7 @@ export function applyAMLRules(transaction, activeRuleNames, contextTxns = []) {
   //    Only flag if there's actual clustering evidence (multiple near-threshold txns)
   if (activeRuleNames.has('Structuring')) {
     const isStructuring = amount < 1000000 && amount >= 50000;
-    
+
     if (isStructuring && contextTxns.length > 0) {
       const thirtyDaysAgo = new Date(transaction.transaction_date || Date.now());
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -293,10 +334,10 @@ export function applyAMLRules(transaction, activeRuleNames, contextTxns = []) {
 
       if (sumBelowThreshold >= 1000000 && countBelowThreshold >= 2) {
         score += 25;
-        triggered_rules.push('Structuring (Breaking ₹10L limit)');
+        triggered_rules.push(`Structuring (+25: Breaking ₹10L limit, ${countBelowThreshold} txns summing to ₹${sumBelowThreshold.toLocaleString()})`);
       } else if (sumBelowThreshold >= 800000 && countBelowThreshold >= 3) {
         score += 15;
-        triggered_rules.push('Possible Structuring Pattern');
+        triggered_rules.push(`Possible Structuring (+15: ${countBelowThreshold} txns summing to ₹${sumBelowThreshold.toLocaleString()})`);
       }
     }
   }
@@ -305,21 +346,21 @@ export function applyAMLRules(transaction, activeRuleNames, contextTxns = []) {
   if (activeRuleNames.has('Velocity Spike')) {
     const freq = parseFloat(transaction.transaction_frequency_1hr) || 0;
     const avgFreq = parseFloat(transaction.avg_frequency_1hr) || 2;
-    
+
     // Connect to time of day (odd hours e.g. IST midnight to 5AM)
     const txDate = new Date(transaction.transaction_date || Date.now());
     const istHour = (txDate.getUTCHours() + 5.5) % 24;
     const isOddHour = istHour >= 0 && istHour <= 5;
-    
+
     if (freq >= 7 && isOddHour) {
       score += 35;
-      triggered_rules.push('Velocity Spike (Extreme at Odd Hours)');
+      triggered_rules.push(`Velocity Spike (+35: ${freq} txns/hr at Odd Hours)`);
     } else if (freq >= 4 && freq >= avgFreq * 3) {
       score += 25;
-      triggered_rules.push('Velocity Spike (High Context)');
+      triggered_rules.push(`Velocity Spike (+25: ${freq} txns/hr vs avg ${avgFreq.toFixed(1)})`);
     } else if (isOddHour && amount > 10000) {
       score += 15;
-      triggered_rules.push('Velocity Spike (Odd Hour Activity)');
+      triggered_rules.push('Velocity Spike (+15: Odd Hour Activity > ₹10k)');
     }
   }
 
@@ -328,10 +369,10 @@ export function applyAMLRules(transaction, activeRuleNames, contextTxns = []) {
     const daysSince = parseFloat(transaction.days_since_last_transaction) || 0;
     if (daysSince >= 45 && amount > 5000) {
       score += 25;
-      triggered_rules.push('Dormancy Activation (45d+ & High Value)');
+      triggered_rules.push(`Dormancy Activation (+25: ${daysSince.toFixed(0)}d inactive & High Value)`);
     } else if (daysSince >= 90) {
       score += 25;
-      triggered_rules.push('Dormancy Activation (90d+)');
+      triggered_rules.push(`Dormancy Activation (+25: ${daysSince.toFixed(0)}d inactive)`);
     }
   }
 
@@ -341,7 +382,7 @@ export function applyAMLRules(transaction, activeRuleNames, contextTxns = []) {
     const centrality = parseFloat(transaction.degree_centrality) || 0;
     if (hops >= 4 && centrality > 0.5) {
       score += 25;
-      triggered_rules.push('Layering (Complex Multi-Hop Network)');
+      triggered_rules.push(`Layering (+25: ${hops} hops, centrality ${centrality.toFixed(2)})`);
     }
   }
 
@@ -349,10 +390,10 @@ export function applyAMLRules(transaction, activeRuleNames, contextTxns = []) {
   if (activeRuleNames.has('PEP / HNI Flag')) {
     if ((transaction.pep_flag === true || transaction.pep_flag === 'true') && amount > 5000) {
       score += 25;
-      triggered_rules.push('PEP Flag (High Value)');
+      triggered_rules.push('PEP Flag (+25: High Value)');
     } else if (transaction.pep_flag === true || transaction.pep_flag === 'true') {
       score += 25;
-      triggered_rules.push('PEP Context');
+      triggered_rules.push('PEP Flag (+25)');
     }
   }
 
@@ -361,7 +402,7 @@ export function applyAMLRules(transaction, activeRuleNames, contextTxns = []) {
   if (activeRuleNames.has('New Device High Value')) {
     if (transaction.is_new_device && amount > 20000) {
       score += 10;
-      triggered_rules.push('New Device High Value ($20k+)');
+      triggered_rules.push('New Device (+10: First time device & > ₹20k)');
     }
   }
 
@@ -370,29 +411,74 @@ export function applyAMLRules(transaction, activeRuleNames, contextTxns = []) {
     const balBefore = parseFloat(transaction.balance_before) || 0;
     if (balBefore > 0 && amount >= balBefore * 0.85 && amount > 8000) {
       score += 35;
-      triggered_rules.push('Rapid Movement (>85% drain)');
+      triggered_rules.push(`Rapid Movement (+35: ${((amount/balBefore)*100).toFixed(0)}% drain)`);
     }
   }
 
   // 8b. Cryptocurrency Activity [Weight: 35]
   if (activeRuleNames.has('Cryptocurrency Activity')) {
     if ((transaction.transaction_type || '').toLowerCase().includes('crypto') ||
-        (transaction.destination_id || '').toLowerCase().includes('crypto')) {
+      (transaction.destination_id || '').toLowerCase().includes('crypto')) {
       score += 35;
-      triggered_rules.push('Cryptocurrency Dealings');
+      triggered_rules.push('Cryptocurrency Activity (+35)');
     }
   }
 
-  // 9. Income Mismatch [Weight: 25]
+  // 9. Income Mismatch — RSF = (|TotalCredits - TotalDebits|) / Stated Monthly Income [Weight: 25]
+  // Mentor formula: RSF > 5x = HIGH risk (e.g. ₹1,50,000 balance / ₹20,000 income = 7.5x)
   if (activeRuleNames.has('Income Mismatch') && contextTxns.length > 0) {
-    const thirtyDaysAgo = new Date(transaction.transaction_date || Date.now());
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const recentSum = contextTxns
-      .filter(t => new Date(t.transaction_date) >= thirtyDaysAgo)
-      .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
-    if (recentSum >= 1500000) {
-      score += 25;
-      triggered_rules.push('Income Mismatch (15L+ in 30 days)');
+    const refDate = new Date(transaction.transaction_date || Date.now());
+    const cutoff = new Date(refDate.getTime() - RULE_CFG.INCOME_MISMATCH.LOOKBACK_DAYS * 86400000);
+    const recentTxns = contextTxns.filter(t => new Date(t.transaction_date) >= cutoff);
+
+    const totalCredits = recentTxns
+      .filter(t => (t.transaction_type || '').toLowerCase() === 'credit')
+      .reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);
+    const totalDebits = recentTxns
+      .filter(t => (t.transaction_type || '').toLowerCase() !== 'credit')
+      .reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);
+    const netBalance = Math.abs(totalCredits - totalDebits);
+
+    // Use customer income from the transaction object if enriched, else skip
+    const monthlyIncome = parseFloat(transaction.customer_income) || 0;
+    if (monthlyIncome > 0) {
+      const rsf = netBalance / monthlyIncome;
+      if (rsf > RULE_CFG.INCOME_MISMATCH.RSF_HIGH_THRESHOLD) {
+        score += 35;
+        triggered_rules.push(`Income Mismatch (+35: RSF ${rsf.toFixed(1)}x vs ₹${monthlyIncome.toLocaleString('en-IN')} income)`);
+      } else if (rsf > RULE_CFG.INCOME_MISMATCH.RSF_MEDIUM_THRESHOLD) {
+        score += 20;
+        triggered_rules.push(`Income Mismatch (+20: RSF ${rsf.toFixed(1)}x)`);
+      }
+    } else {
+      // Fallback: flag if net balance is very high (no income data)
+      if (netBalance >= 1500000) {
+        score += 25;
+        triggered_rules.push('Income Mismatch (+25: ₹15L+ net in 30d — income unknown)');
+      }
+    }
+  }
+
+  // 10. Transaction Quantity Spike [Weight: 25]
+  // Mentor rule: avg customer has 5-6 txns/month; sudden jump to 100+ = alert
+  if (activeRuleNames.has('Velocity Spike') && contextTxns.length > 0) {
+    const refDate = new Date(transaction.transaction_date || Date.now());
+    const thisMonthStart = new Date(refDate.getFullYear(), refDate.getMonth(), 1);
+    const currentMonthCount = contextTxns.filter(t => new Date(t.transaction_date) >= thisMonthStart).length;
+
+    if (currentMonthCount >= RULE_CFG.TRANSACTION_VELOCITY.MIN_COUNT_TO_TRIGGER) {
+      // Compare to 3-month rolling average
+      const threeMonthsAgo = new Date(thisMonthStart);
+      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - RULE_CFG.TRANSACTION_VELOCITY.BASELINE_MONTHS);
+      const historicCount = contextTxns.filter(t => {
+        const d = new Date(t.transaction_date);
+        return d >= threeMonthsAgo && d < thisMonthStart;
+      }).length;
+      const avgMonthly = historicCount / RULE_CFG.TRANSACTION_VELOCITY.BASELINE_MONTHS;
+      if (avgMonthly > 0 && currentMonthCount > avgMonthly * RULE_CFG.TRANSACTION_VELOCITY.SPIKE_MULTIPLIER) {
+        score += 25;
+        triggered_rules.push(`Quantity Spike (+25: ${currentMonthCount} txns vs avg ${avgMonthly.toFixed(1)})`);
+      }
     }
   }
 
@@ -410,18 +496,18 @@ export function applyAMLRules(transaction, activeRuleNames, contextTxns = []) {
 
 export async function generateAlertsFromTransactions(transactions) {
   const activeRules = await apiGet('/api/rules');
-  
+
   if (!activeRules || !Array.isArray(activeRules)) {
     throw new Error('Failed to fetch AML rules. Please re-login and try again.');
   }
-  
+
   const activeRuleNames = new Set(activeRules.filter(r => r.status === 'active').map(r => r.name));
   console.log(`[AML] Active rules (${activeRuleNames.size}):`, [...activeRuleNames]);
-  
+
   if (activeRuleNames.size === 0) {
     throw new Error('No active rules found. Go to Transaction Monitoring → Rule Library to activate rules.');
   }
-  
+
   const alertsToInsert = [];
   const flagUpdates = [];
 

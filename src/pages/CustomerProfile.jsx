@@ -53,12 +53,11 @@ export default function CustomerProfile() {
       setDocuments(docs);
       setNotes(noteData);
 
-      const riskResult = computeRiskScore(cust, txns);
-      setRisk(riskResult);
-
-      // Run screening on page load
       const screenResult = await screenCustomer(cust.name, cust.date_of_birth, cust.country);
       setScreening(screenResult);
+      
+      const riskResult = computeRiskScore(cust, txns, screenResult);
+      setRisk(riskResult);
 
       logEvent('CUSTOMER_VIEWED', 'customer', id, { name: cust.name, country: cust.country });
       logEvent('SCREENING_RUN', 'customer', id, { name: cust.name, result: screenResult?.match });
@@ -198,16 +197,24 @@ export default function CustomerProfile() {
               </div>
               <div className="score-breakdown">
                 <div className="score-breakdown-item">
-                  <span className="label">Profile Risk (PEP/HNI)</span>
-                  <span className="value">{risk.breakdown.profile_risk || 0}/80</span>
+                  <span className="label">Transactions Risk</span>
+                  <span className="value">{risk.breakdown.transaction_risk || 0}/50</span>
                 </div>
+                {risk.breakdown.transaction_risk > 0 && (
+                  <div style={{ paddingLeft: '1rem', marginBottom: '0.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '0.2rem' }}>
+                      <span>↳ Severity (max alert score)</span>
+                      <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>{risk.breakdown.severity || 0}/35</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                      <span>↳ Frequency ({risk.breakdown.flagged_count || 0} flagged txn{(risk.breakdown.flagged_count || 0) !== 1 ? 's' : ''})</span>
+                      <span style={{ fontFamily: 'JetBrains Mono, monospace' }}>{risk.breakdown.frequency || 0}/15</span>
+                    </div>
+                  </div>
+                )}
                 <div className="score-breakdown-item">
-                  <span className="label">Crypto Dealings</span>
-                  <span className="value">{risk.breakdown.crypto_risk || 0}/50</span>
-                </div>
-                <div className="score-breakdown-item">
-                  <span className="label">Income Mismatch</span>
-                  <span className="value">{risk.breakdown.income_mismatch || 0}/50</span>
+                  <span className="label">Screening Risk</span>
+                  <span className="value">{risk.breakdown.screening_risk || 0}/50</span>
                 </div>
               </div>
               
@@ -343,7 +350,10 @@ export default function CustomerProfile() {
                     <td style={{ fontSize: '0.75rem' }}>{tx.transaction_type || 'N/A'}</td>
                     <td>{tx.country || 'N/A'}</td>
                     <td style={{ fontSize: '0.75rem', color: tx.rule_triggered ? '#f59e0b' : 'var(--text-muted)' }}>
-                      {tx.rule_triggered || 'None'}
+                      <div>{tx.rule_triggered || 'None'}</div>
+                      {tx.risk_score && tx.rule_triggered ? (
+                         <div style={{ fontSize: '0.6rem', color: '#6b7280', marginTop: '2px' }}>Score: {tx.risk_score}/100</div>
+                      ) : null}
                     </td>
                   </tr>
                 ))}

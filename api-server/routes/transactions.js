@@ -380,10 +380,19 @@ router.post('/', authenticateToken, async (req, res) => {
 router.delete('/', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
-    // Delete user's alerts first
-    const alertResult = await pool.query('DELETE FROM alerts WHERE uploaded_by = $1', [userId]);
-    // Then delete user's transactions
-    const txnResult = await pool.query('DELETE FROM transactions WHERE uploaded_by = $1', [userId]);
+    const isAdmin = req.user.role === 'admin';
+    let alertResult, txnResult;
+    
+    if (isAdmin) {
+      alertResult = await pool.query('DELETE FROM alerts');
+      txnResult = await pool.query('DELETE FROM transactions');
+    } else {
+      // Delete user's alerts first
+      alertResult = await pool.query('DELETE FROM alerts WHERE uploaded_by = $1', [userId]);
+      // Then delete user's transactions
+      txnResult = await pool.query('DELETE FROM transactions WHERE uploaded_by = $1', [userId]);
+    }
+    
     res.json({ deleted_transactions: txnResult.rowCount, deleted_alerts: alertResult.rowCount });
   } catch (err) {
     console.error('Delete transactions error:', err);

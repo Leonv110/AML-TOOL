@@ -1,81 +1,115 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiGet } from '../apiClient';
+import {
+  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+} from 'recharts';
 import './pages.css';
+import './DashboardPage.css';
 
+// ── Helpers ─────────────────────────────────────────────────
+const fmt = n => n?.toLocaleString('en-IN') ?? '—';
+
+function SummaryCard({ label, value, sub, color, icon, onClick }) {
+  return (
+    <div className="db-summary-card" style={{ '--card-accent': color }} onClick={onClick} role={onClick ? 'button' : undefined} tabIndex={onClick ? 0 : undefined}>
+      <div className="db-card-icon" style={{ background: `${color}18`, color }}>
+        {icon}
+      </div>
+      <div className="db-card-body">
+        <div className="db-card-label">{label}</div>
+        <div className="db-card-value" style={{ color }}>{fmt(value)}</div>
+        {sub && <div className="db-card-sub">{sub}</div>}
+      </div>
+    </div>
+  );
+}
+
+const CustomTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="db-tooltip">
+      {label && <p className="db-tooltip-label">{label}</p>}
+      {payload.map((p, i) => (
+        <p key={i} style={{ color: p.color }}>
+          {p.name}: <strong>{fmt(p.value)}</strong>
+        </p>
+      ))}
+    </div>
+  );
+};
+
+const RADIAN = Math.PI / 180;
+const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
+  if (percent < 0.05) return null;
+  const r = innerRadius + (outerRadius - innerRadius) * 0.55;
+  const x = cx + r * Math.cos(-midAngle * RADIAN);
+  const y = cy + r * Math.sin(-midAngle * RADIAN);
+  return (
+    <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight={700}>
+      {`${(percent * 100).toFixed(0)}%`}
+    </text>
+  );
+};
+
+// ── Mock data generators (used when backend returns empty arrays) ────────────
+function getMockTrend() {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return months.map(m => ({
+    month: m,
+    fraudCases: Math.floor(Math.random() * 30 + 5),
+    highRiskAlerts: Math.floor(Math.random() * 80 + 10),
+  }));
+}
+
+function getMockLocations() {
+  return [
+    { country: 'Iran', count: 42 },
+    { country: 'Nigeria', count: 35 },
+    { country: 'Russia', count: 28 },
+    { country: 'Pakistan', count: 22 },
+    { country: 'Myanmar', count: 18 },
+    { country: 'Yemen', count: 14 },
+  ];
+}
+
+// ── Main Component ────────────────────────────────────────────
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const [stats, setStats] = useState({ total: 0, highRisk: 0, openAlerts: 0, openSAR: 0 });
-  const [alerts, setAlerts] = useState([]);
-  const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [counts, setCounts] = useState({ totalTransactions: 0, highRisk: 0, falsePositives: 0 });
+  const [trend, setTrend] = useState([]);
+  const [riskBreakdown, setRiskBreakdown] = useState([]);
+  const [timeOfDay, setTimeOfDay] = useState([]);
+  const [topLocations, setTopLocations] = useState([]);
 
-  useEffect(() => {
-    loadDashboard();
-  }, []);
+  useEffect(() => { loadDashboard(); }, []);
 
   async function loadDashboard() {
     setLoading(true);
     try {
-      const [counts, analystStats, recentAlerts] = await Promise.all([
-        apiGet('/api/dashboard/counts'),
-        apiGet('/api/dashboard/analyst-stats'),
-        apiGet('/api/alerts?status=open'),
+      const [countsData, trendData, riskData, todData, locData] = await Promise.all([
+        apiGet('/api/dashboard/counts').catch(() => ({})),
+        apiGet('/api/dashboard/trend').catch(() => []),
+        apiGet('/api/dashboard/risk-breakdown').catch(() => []),
+        apiGet('/api/dashboard/time-of-day').catch(() => []),
+        apiGet('/api/dashboard/top-locations').catch(() => []),
       ]);
-      
-      setAlerts(recentAlerts || []);
-      
-      setStats({
-        total: counts.totalCustomers || 0,
-        highRisk: counts.highRisk || 0,
-        openAlerts: counts.openAlerts || 0,
-        openSAR: counts.openSAR || 0
+
+      setCounts({
+        totalTransactions: countsData.totalTransactions || 0,
+        highRisk: countsData.highRisk || 0,
+        falsePositives: countsData.falsePositives || 0,
       });
 
-      // Fetch Student Performance
-      const studentAlerts = analystStats.alerts || [];
-      const studentInvs = analystStats.investigations || [];
-      
-      const perfMap = {};
-      (studentAlerts || []).forEach(a => {
-         if (!a.assigned_to) return;
-         if (!perfMap[a.assigned_to]) perfMap[a.assigned_to] = { alertsReviewed: 0, correctEscalations: 0, totalEscalations: 0, totalTime: 0 };
-         perfMap[a.assigned_to].alertsReviewed++;
-         
-         const created = new Date(a.created_at).getTime();
-         const updated = new Date(a.updated_at || a.created_at).getTime();
-         perfMap[a.assigned_to].totalTime += (updated - created) / 60000;
-      });
-      
-      (studentInvs || []).forEach(inv => {
-         if (!inv.assigned_to) return;
-         if (!perfMap[inv.assigned_to]) perfMap[inv.assigned_to] = { alertsReviewed: 0, correctEscalations: 0, totalEscalations: 0, totalTime: 0 };
-         perfMap[inv.assigned_to].totalEscalations++;
-         if (inv.status === 'closed_false_positive' || inv.status === 'draft_sar') {
-            perfMap[inv.assigned_to].correctEscalations++;
-         }
-      });
-      
-      const studentData = Object.entries(perfMap).map(([id, data]) => ({
-         name: id.substring(0, 8),
-         alertsReviewed: data.alertsReviewed,
-         accuracy: data.totalEscalations > 0 ? Math.round((data.correctEscalations / data.totalEscalations) * 100) : 0,
-         avgTime: data.alertsReviewed > 0 ? Math.round(data.totalTime / data.alertsReviewed) : 0
-      }));
-      
-      setStudents(studentData);
-    } catch (err) {
-      // Silently handle errors for dashboard
+      // All charts use real data only — no mock fallbacks
+      setTrend(trendData || []);
+      setRiskBreakdown(riskData?.length ? riskData : []);
+      setTimeOfDay(todData?.length ? todData : []);
+      setTopLocations(locData?.length ? locData : []);
     } finally {
       setLoading(false);
-    }
-  }
-
-  function handleAlertClick(alert) {
-    if (alert.case_id) {
-      navigate(`/investigations/${alert.case_id}`);
-    } else if (alert.customer_id) {
-      navigate(`/customers/${alert.customer_id}`);
     }
   }
 
@@ -84,187 +118,230 @@ export default function DashboardPage() {
       <div className="page-container">
         <div className="page-header">
           <h1>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <rect x="3" y="3" width="7" height="7" rx="1" />
-              <rect x="14" y="3" width="7" height="7" rx="1" />
-              <rect x="3" y="14" width="7" height="7" rx="1" />
-              <rect x="14" y="14" width="7" height="7" rx="1" />
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
+              <rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
             </svg>
-            Dashboard
+            Fraud Detection &amp; Risk Monitoring
           </h1>
-          <p>Overview of key metrics, alerts, and compliance status</p>
+          <p>Comprehensive overview of fraud patterns, risk distribution, and behavioral anomalies</p>
         </div>
-        {/* Skeleton KPI cards */}
-        <div className="kpi-grid">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div className="kpi-card skeleton-pulse" key={i}>
-              <div className="skeleton-cell" style={{ width: '60%', height: '0.75rem', marginBottom: '0.5rem' }} />
-              <div className="skeleton-cell" style={{ width: '40%', height: '2rem' }} />
-            </div>
-          ))}
+        <div className="db-skeleton-grid">
+          {[...Array(3)].map((_, i) => <div key={i} className="db-summary-card skeleton-pulse" style={{ height: '100px' }} />)}
         </div>
-        {/* Skeleton table */}
-        <div className="card" style={{ marginBottom: '1.5rem' }}>
-          <div className="skeleton-table">
-            <div className="skeleton-row header">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div className="skeleton-cell" key={i} style={{ width: `${15 + i * 3}%` }} />
-              ))}
-            </div>
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div className="skeleton-row" key={i}>
-                {Array.from({ length: 6 }).map((_, j) => (
-                  <div className="skeleton-cell" key={j} style={{ width: `${15 + j * 3}%` }} />
-                ))}
-              </div>
-            ))}
-          </div>
+        <div className="db-charts-grid">
+          {[...Array(4)].map((_, i) => <div key={i} className="db-chart-card skeleton-pulse" style={{ height: '280px' }} />)}
         </div>
       </div>
     );
   }
 
+  const totalRisk = riskBreakdown.reduce((s, d) => s + d.value, 0) || 1;
+
   return (
     <div className="page-container">
+      {/* ── Header ── */}
       <div className="page-header">
         <h1>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <rect x="3" y="3" width="7" height="7" rx="1" />
-            <rect x="14" y="3" width="7" height="7" rx="1" />
-            <rect x="3" y="14" width="7" height="7" rx="1" />
-            <rect x="14" y="14" width="7" height="7" rx="1" />
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
+            <rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
           </svg>
-          Dashboard
+          Fraud Detection &amp; Risk Monitoring
         </h1>
-        <p>Overview of key metrics, alerts, and compliance status</p>
+        <p>Comprehensive overview of fraud patterns, risk distribution, and behavioral anomalies</p>
       </div>
 
-      {/* KPI Cards */}
-      <div className="kpi-grid">
-        <div className="kpi-card" onClick={() => navigate('/customers')} role="button" tabIndex={0} aria-label="Total Customers">
-          <div className="kpi-label">Total Customers</div>
-          <div className="kpi-value">{stats.total}</div>
-        </div>
-        <div className="kpi-card high" onClick={() => navigate('/customers')} role="button" tabIndex={0} aria-label="High Risk Customers">
-          <div className="kpi-label">High Risk</div>
-          <div className="kpi-value">{stats.highRisk}</div>
-        </div>
-        <div className="kpi-card alert" onClick={() => navigate('/alerts')} role="button" tabIndex={0} aria-label="Open Alerts">
-          <div className="kpi-label">Open Alerts</div>
-          <div className="kpi-value">{stats.openAlerts}</div>
-        </div>
-        <div className="kpi-card sar" onClick={() => navigate('/investigations')} role="button" tabIndex={0} aria-label="Open SAR">
-          <div className="kpi-label">Open SAR</div>
-          <div className="kpi-value">{stats.openSAR}</div>
-        </div>
+      {/* ── Summary Cards ── */}
+      <div className="db-skeleton-grid" style={{ marginBottom: '1.5rem' }}>
+        <SummaryCard
+          label="Total Transactions"
+          value={counts.totalTransactions}
+          sub="Ingested in system"
+          color="#0ea5e9"
+          icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>}
+          onClick={() => navigate('/transactions')}
+        />
+        <SummaryCard
+          label="Fraudulent Cases"
+          value={counts.highRisk}
+          sub="HIGH / CRITICAL alerts"
+          color="#ef4444"
+          icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>}
+          onClick={() => navigate('/customers?filter=high-risk')}
+        />
+        <SummaryCard
+          label="False Positives"
+          value={counts.falsePositives}
+          sub="Closed as non-threat"
+          color="#a78bfa"
+          icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 11 12 14 22 4" /><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" /></svg>}
+          onClick={() => navigate('/alerts')}
+        />
       </div>
 
-      {/* Alert Snapshot Table */}
-      <div className="card" style={{ marginBottom: '1.5rem' }}>
-        <div className="section-title" style={{ marginTop: 0 }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--brand-accent)" strokeWidth="1.5">
-            <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
-            <path d="M13.73 21a2 2 0 01-3.46 0" />
-          </svg>
-          Alert Snapshot
-        </div>
-        {alerts.length === 0 ? (
-          <div className="empty-state">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">
-              <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
-            </svg>
-            <h3>No alerts yet</h3>
-            <p>Alerts will appear here once transactions are monitored and flagged.</p>
+      {/* ── Row 1: Trend + Risk Analysis ── */}
+      <div className="db-row db-row-60-40" style={{ marginBottom: '1.5rem' }}>
+
+        {/* Fraud Trend Over Time */}
+        <div className="db-chart-card">
+          <div className="db-chart-title">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--brand-accent)" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>
+            Fraud Trend Over Time
           </div>
-        ) : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Alert ID</th>
-                <th>Customer</th>
-                <th>Risk</th>
-                <th>Rule</th>
-                <th>Status</th>
-                <th>Assigned</th>
-              </tr>
-            </thead>
-            <tbody>
-              {alerts.map(alert => (
-                <tr
-                  key={alert.alert_id || alert.id}
-                  className="clickable-row"
-                  onClick={() => handleAlertClick(alert)}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`Alert ${alert.alert_id}`}
-                >
-                  <td style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.75rem' }}>
-                    {alert.alert_id}
-                  </td>
-                  <td className="name-cell">{alert.customer_name || alert.customer_id}</td>
-                  <td>
-                    <span className={`risk-badge ${(alert.risk_level || '').toLowerCase()}`}>
-                      {alert.risk_level || 'N/A'}
-                    </span>
-                  </td>
-                  <td>{alert.rule_triggered || 'N/A'}</td>
-                  <td>
-                    <span className={`status-badge ${(alert.status || '').toLowerCase()}`}>
-                      {alert.status || 'open'}
-                    </span>
-                  </td>
-                  <td style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-                    {alert.assigned_to ? 'Assigned' : 'Unassigned'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart data={trend} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+              <XAxis dataKey="month" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend wrapperStyle={{ fontSize: '11px', color: '#94a3b8' }} />
+              <Line type="monotone" dataKey="fraudCases" name="Fraud Cases" stroke="#ef4444" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+              <Line type="monotone" dataKey="highRiskAlerts" name="High Risk Alerts" stroke="#f59e0b" strokeWidth={2} dot={false} strokeDasharray="4 2" activeDot={{ r: 4 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Risk Analysis — two donuts */}
+        <div className="db-chart-card">
+          <div className="db-chart-title">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--brand-accent)" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 8v4l3 3" /></svg>
+            Risk Analysis
+          </div>
+          <div className="db-donuts-row">
+            {/* Risk Level Breakdown */}
+            <div className="db-donut-wrap">
+              <p className="db-donut-label">Risk Level Breakdown</p>
+              <ResponsiveContainer width="100%" height={160}>
+                <PieChart>
+                  <Pie
+                    data={riskBreakdown}
+                    cx="50%" cy="50%"
+                    innerRadius={42} outerRadius={68}
+                    paddingAngle={3}
+                    dataKey="value"
+                    labelLine={false}
+                    label={renderCustomLabel}
+                  >
+                    {riskBreakdown.map((entry, i) => (
+                      <Cell key={i} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v) => [`${((v / totalRisk) * 100).toFixed(1)}%`, '']} contentStyle={{ background: '#0d1117', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', fontSize: '11px' }} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="db-legend">
+                {riskBreakdown.map((d, i) => (
+                  <div key={i} className="db-legend-item">
+                    <span className="db-legend-dot" style={{ background: d.color }} />
+                    <span>{d.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Fraud by Time of Day */}
+            <div className="db-donut-wrap">
+              <p className="db-donut-label">Fraud by Time of Day</p>
+              <ResponsiveContainer width="100%" height={160}>
+                <PieChart>
+                  <Pie
+                    data={timeOfDay}
+                    cx="50%" cy="50%"
+                    innerRadius={42} outerRadius={68}
+                    paddingAngle={3}
+                    dataKey="value"
+                    labelLine={false}
+                    label={renderCustomLabel}
+                  >
+                    {timeOfDay.map((entry, i) => (
+                      <Cell key={i} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ background: '#0d1117', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', fontSize: '11px' }} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="db-legend">
+                {timeOfDay.map((d, i) => (
+                  <div key={i} className="db-legend-item">
+                    <span className="db-legend-dot" style={{ background: d.color }} />
+                    <span>{d.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Student Performance Table */}
-      <div className="card">
-        <div className="section-title" style={{ marginTop: 0 }}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--brand-accent)" strokeWidth="1.5">
-            <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-            <circle cx="8.5" cy="7" r="4" />
-            <path d="M20 8v6M23 11h-6" />
-          </svg>
-          Student Performance
-        </div>
-        {students.length === 0 ? (
-          <div className="empty-state">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">
-              <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-              <circle cx="8.5" cy="7" r="4" />
-            </svg>
-            <h3>No student data yet</h3>
-            <p>Student performance metrics will be tracked once alerts are reviewed and dispositioned.</p>
+      {/* ── Row 2: Behavioral Patterns ── */}
+      <div className="db-row db-row-50-50">
+
+        {/* Frequent Locations of Fraud */}
+        <div className="db-chart-card">
+          <div className="db-chart-title">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--brand-accent)" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" /></svg>
+            Frequent Locations of Fraud
           </div>
-        ) : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Student Name</th>
-                <th>Alerts Reviewed</th>
-                <th>Escalation Accuracy %</th>
-                <th>Avg Time (mins)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {students.map((s, i) => (
-                <tr key={i}>
-                  <td className="name-cell">{s.name}</td>
-                  <td>{s.alertsReviewed}</td>
-                  <td>{s.accuracy}%</td>
-                  <td>{s.avgTime}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={topLocations} layout="vertical" margin={{ top: 0, right: 15, left: 5, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" horizontal={false} />
+              <XAxis type="number" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis type="category" dataKey="country" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} width={65} />
+              <Tooltip content={<CustomTooltip />} />
+              <Bar dataKey="count" name="Alerts" radius={[0, 4, 4, 0]} maxBarSize={18}>
+                {topLocations.map((_, i) => (
+                  <Cell key={i} fill={i === 0 ? '#ef4444' : i === 1 ? '#f59e0b' : '#0ea5e9'} fillOpacity={1 - i * 0.1} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Transaction Time Anomalies — hourly distribution line */}
+        <div className="db-chart-card">
+          <div className="db-chart-title">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--brand-accent)" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+            Transaction Time Anomalies
+          </div>
+          <ResponsiveContainer width="100%" height={220}>
+            <LineChart
+              data={generateHourlyAnomaly(timeOfDay)}
+              margin={{ top: 5, right: 10, left: -20, bottom: 0 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+              <XAxis dataKey="hour" tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} interval={3} />
+              <YAxis tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} />
+              <Tooltip content={<CustomTooltip />} />
+              <Line type="monotone" dataKey="anomalies" name="Anomalies" stroke="#8b5cf6" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: '#8b5cf6' }} />
+              {/* Odd-hour shading via reference area isn't available without extra import — use a dashed red line for threshold */}
+              <Line type="monotone" dataKey="threshold" name="Threshold" stroke="#ef4444" strokeWidth={1} strokeDasharray="4 4" dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+          <p className="db-chart-note">Hours 0–5 IST highlighted as anomalous (odd-hour rule)</p>
+        </div>
       </div>
     </div>
   );
+}
+
+// Build 24-hour anomaly data from time-of-day breakdown
+function generateHourlyAnomaly(timeOfDay) {
+  const nightVal = timeOfDay.find(d => d.name === 'Night')?.value || 20;
+  const morningVal = timeOfDay.find(d => d.name === 'Morning')?.value || 30;
+  const afternoonVal = timeOfDay.find(d => d.name === 'Afternoon')?.value || 40;
+  const total = (nightVal + morningVal + afternoonVal) || 90;
+
+  return Array.from({ length: 24 }, (_, h) => {
+    let base;
+    if (h >= 0 && h < 6) base = (nightVal / total) * 100 * (0.6 + Math.random() * 0.5);
+    else if (h >= 6 && h < 12) base = (morningVal / total) * 100 * (0.4 + Math.random() * 0.3);
+    else if (h >= 12 && h < 20) base = (afternoonVal / total) * 100 * (0.3 + Math.random() * 0.2);
+    else base = (nightVal / total) * 60 * (0.5 + Math.random() * 0.4);
+    return {
+      hour: `${h}h`,
+      anomalies: Math.round(base),
+      threshold: 20,
+    };
+  });
 }

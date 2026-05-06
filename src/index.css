@@ -4,7 +4,7 @@
 
 :root {
   /* Corporate Liquid Glass Palette (Matched to new logo) */
-  --gafa-deep: #081024;
+  --gafa-deep: #0c1428;  /* Softened from #081024 — easier on eyes */
   --gafa-surface: rgba(14, 25, 48, 0.7);
   --gafa-glass: rgba(255, 255, 255, 0.04);
   --gafa-glass-border: rgba(255, 255, 255, 0.08);
@@ -53,7 +53,7 @@ body {
   right: 0;
   bottom: 0;
   z-index: -2;
-  background: radial-gradient(circle at 50% 10%, #15254b 0%, #081024 100%);
+  background: radial-gradient(circle at 50% 10%, #172d54 0%, #0c1428 100%);
 }
 
 .liquid-blob {

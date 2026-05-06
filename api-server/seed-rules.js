@@ -16,16 +16,16 @@ async function seedRules() {
     }
 
     const rules = [
-      ['Geographic Risk', 'Entities in FATF blacklisted/grey-listed jurisdictions (Iran, North Korea, Myanmar, Syria, Yemen, Mali)', 'FATF blacklist/greylist', 'active'],
-      ['Cryptocurrency Activity', 'Customers dealing in cryptocurrency transactions are considered higher risk', 'Any crypto transaction', 'active'],
-      ['PEP / HNI Flag', 'Politically Exposed Persons or High Net Worth Individuals', 'PEP=true OR HNI narration', 'active'],
-      ['Structuring', 'Breaking large amounts into smaller chunks within 30 days to avoid reporting thresholds (₹10,00,000 CTR limit)', 'Cumulative >₹10,00,000 in 30 days', 'active'],
-      ['Income Mismatch', 'Transaction volume exceeds customer declared income profile', '>3× monthly income in 30 days', 'active'],
-      ['Velocity Spike', 'Abnormal transaction frequency within short time window', '≥5 txns/hour or 3× average', 'active'],
-      ['Dormancy Activation', 'Sudden activity on previously dormant account', '>30 days inactive then active', 'active'],
-      ['Layering', 'Complex multi-hop fund flows through shell entities to obscure origin', 'path_length ≥4, centrality >0.5', 'active'],
-      ['New Device High Value', 'First-time device used for high-value transaction', 'Amount >2× customer average', 'active'],
-      ['Rapid Fund Movement', 'Large proportion of account balance moved in single transaction', '≥80% of balance moved', 'active'],
+      ['Geographic Risk', 'Flags transactions involving FATF blacklisted/grey-listed jurisdictions (e.g., Iran, North Korea, Syria). High value (>15k) gets critical risk.', 'Country Match or High Risk Level', 'active'],
+      ['Cryptocurrency Activity', 'Detects if transaction type or destination suggests cryptocurrency dealings (e.g., mentions of "crypto" or "exchange").', 'Keyword match in txn type/dest', 'active'],
+      ['PEP / HNI Flag', 'Identifies transactions by Politically Exposed Persons (PEP) or High Net Worth Individuals. Flags high value transactions heavily.', 'PEP=true & Amt > 5000', 'active'],
+      ['Structuring', 'Detects multiple transactions below CTR limit (₹10,00,000) that sum up to exceed it within 30 days to evade reporting.', 'Cumulative ≥₹10L & Count ≥2 in 30d', 'active'],
+      ['Income Mismatch', 'Calculates Risk Scoring Factor (RSF) = Net Balance / Stated Monthly Income. Flags when RSF exceeds normal bounds (e.g., spending 5x income).', 'RSF > 5x (High), >3x (Med) in 30d', 'active'],
+      ['Velocity Spike', 'Flags unusual transaction frequency, especially if occurring during odd hours (midnight to 5 AM IST) or exceeding 3x the 3-month average.', '≥7/hr (Odd) OR ≥4 & 3× avg', 'active'],
+      ['Dormancy Activation', 'Detects sudden high-value activity on an account that has been dormant for a significant period (45 or 90+ days).', '>45d inactive & >$5k OR >90d', 'active'],
+      ['Layering', 'Identifies complex fund flows through multiple accounts to obscure origin, using graph metrics (hops and centrality).', 'path_length ≥4 & centrality >0.5', 'active'],
+      ['New Device High Value', 'Flags when a customer uses a completely new device to initiate an unusually large transaction (>20k).', 'new_device=true & Amt >20k', 'active'],
+      ['Rapid Fund Movement', 'Detects quick draining of an account, where a single transaction moves a vast majority (≥85%) of the previous balance.', '≥85% of balance moved & >8k', 'active'],
     ];
 
     for (const [name, description, threshold, status] of rules) {

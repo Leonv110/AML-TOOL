@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect, Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { apiPost, apiDelete, apiPut, apiGet } from '../apiClient';
+import { apiPost, apiDelete, apiPut, apiGet, apiPatch } from '../apiClient';
 import { useAuth } from '../contexts/AuthContext';
-import { generateAlertsFromTransactions } from '../services/dataService';
+import { generateAlertsFromTransactions, computeRiskScore } from '../services/dataService';
 import { screenCustomerManual } from '../services/screeningService';
 import { logEvent } from '../services/auditService';
 import * as XLSX from 'xlsx';
@@ -371,11 +371,52 @@ export default function IngestionPage() {
             setAmlProgressMsg(`Applying AML rules to ${totalTxns.toLocaleString()} transactions...`);
 
             const alertsCreated = await generateAlertsFromTransactions(transactions);
-            setAmlProgress(80);
+            setAmlProgress(70);
 
-            // Step 3: Align counts
+            // Step 3: Compute & persist customer risk tiers
+            setAmlProgressMsg("Computing customer risk scores...");
+            try {
+                // Re-fetch all transactions (now with flagged status & risk_score)
+                const updatedTxns = await apiGet(`/api/transactions?limit=50000&_t=${Date.now()}`);
+                const customers = await apiGet('/api/customers');
+                
+                if (customers && customers.length > 0 && updatedTxns) {
+                    // Group transactions by customer
+                    const txnsByCustomer = {};
+                    (updatedTxns || []).forEach(t => {
+                        if (!txnsByCustomer[t.customer_id]) txnsByCustomer[t.customer_id] = [];
+                        txnsByCustomer[t.customer_id].push(t);
+                    });
+
+                    // Compute risk for each customer and collect tier updates
+                    const tierUpdates = [];
+                    for (const cust of customers) {
+                        const custTxns = txnsByCustomer[cust.customer_id] || [];
+                        // screeningResult=null here — screening is profile-level and already captured on profile view
+                        const riskResult = computeRiskScore(cust, custTxns, null);
+                        tierUpdates.push({
+                            customer_id: cust.customer_id,
+                            risk_tier: riskResult.tier,
+                        });
+                    }
+
+                    // Bulk update risk tiers
+                    if (tierUpdates.length > 0) {
+                        const BATCH = 500;
+                        for (let i = 0; i < tierUpdates.length; i += BATCH) {
+                            await apiPatch('/api/customers/update-risk-tiers', tierUpdates.slice(i, i + BATCH));
+                        }
+                        console.log(`[AML] Updated risk tiers for ${tierUpdates.length} customers`);
+                    }
+                }
+            } catch (tierErr) {
+                console.error('[AML] Risk tier update failed (non-fatal):', tierErr);
+            }
+            setAmlProgress(90);
+
+            // Step 4: Finalize
             setAmlProgressMsg("Finalizing results...");
-            const flaggedTxns = alertsCreated; // Sync flagged count with actual alerts generated
+            const flaggedTxns = alertsCreated;
 
             setAmlProgress(100);
             const duration = (Date.now() - startTime) / 1000;

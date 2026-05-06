@@ -8,8 +8,8 @@
   --risk-high: #ef4444;
   --risk-medium: #f59e0b;
   --risk-low: #22c55e;
-  --bg-dark: #080a0f;
-  --bg-card: #0d1117;
+  --bg-dark: #0c1428;   /* Softened from #080a0f */
+  --bg-card: #101a2e;   /* Softened from #0d1117 */
   --border-color: rgba(255, 255, 255, 0.08);
   --text-primary: #e2e8f0;
   --text-secondary: #94a3b8;
@@ -182,6 +182,13 @@
   background: rgba(239, 68, 68, 0.12);
   color: #ef4444;
   border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.risk-badge.critical {
+  background: rgba(220, 38, 38, 0.2);
+  color: #fca5a5;
+  border: 1px solid rgba(220, 38, 38, 0.4);
+  font-weight: 700;
 }
 
 .risk-badge.medium {
@@ -682,6 +689,10 @@
   line-height: 1;
 }
 
+.risk-score-number.critical {
+  color: #fca5a5;
+}
+
 .risk-score-number.high {
   color: var(--risk-high);
 }
@@ -702,6 +713,11 @@
   padding: 0.2rem 0.75rem;
   border-radius: 20px;
   font-weight: 700;
+}
+
+.risk-score-tier.critical {
+  background: rgba(220, 38, 38, 0.2);
+  color: #fca5a5;
 }
 
 .risk-score-tier.high {

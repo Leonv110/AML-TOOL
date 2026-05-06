@@ -218,13 +218,28 @@ export default function TransactionMonitoring() {
                         ₹{parseFloat(tx.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </td>
                       <td style={{ fontSize: '0.75rem' }}>{tx.transaction_type || 'N/A'}</td>
-                      <td>{tx.country || 'N/A'}</td>
                       <td>
-                        {tx.country_risk_level ? (
-                          <span className={`risk-badge ${(tx.country_risk_level || '').toLowerCase()}`}>
-                            {tx.country_risk_level}
-                          </span>
-                        ) : <span style={{ color: 'var(--text-muted)' }}>N/A</span>}
+                        <div>{tx.country || 'N/A'}</div>
+                        {tx.country_risk_level && (
+                          <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginTop: '1px' }}>
+                            ({tx.country_risk_level} risk)
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        {(() => {
+                          // Derive severity from computed risk_score, not from country_risk_level
+                          const score = parseFloat(tx.risk_score) || 0;
+                          let severity = 'LOW';
+                          if (tx.flagged && score >= 50) severity = 'CRITICAL';
+                          else if (tx.flagged && score >= 35) severity = 'HIGH';
+                          else if (tx.flagged && score >= 25) severity = 'MEDIUM';
+                          return (
+                            <span className={`risk-badge ${severity.toLowerCase()}`}>
+                              {severity}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td style={{ fontSize: '0.75rem', color: tx.rule_triggered ? '#f59e0b' : 'var(--text-muted)' }}>
                         <div>{tx.rule_triggered || 'None'}</div>

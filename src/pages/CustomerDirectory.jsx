@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchAllCustomers } from '../services/dataService';
 import './pages.css';
 
@@ -8,6 +8,8 @@ export default function CustomerDirectory() {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchParams] = useSearchParams();
+  const filterParam = searchParams.get('filter');
 
   useEffect(() => {
     loadCustomers();
@@ -20,7 +22,7 @@ export default function CustomerDirectory() {
       const allCustomers = await fetchAllCustomers();
       // Sort high risk first using stored risk_tier
       const sorted = (allCustomers || []).sort((a, b) => {
-        const tierOrder = { HIGH: 3, MEDIUM: 2, LOW: 1 };
+        const tierOrder = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
         return (tierOrder[b.risk_tier] || 0) - (tierOrder[a.risk_tier] || 0);
       });
       setCustomers(sorted);
@@ -32,6 +34,8 @@ export default function CustomerDirectory() {
   }
 
   const filtered = customers.filter(c => {
+    if (filterParam === 'high-risk' && c.risk_tier !== 'HIGH' && c.risk_tier !== 'CRITICAL') return false;
+    
     if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
     return (c.normalized_name || '').includes(term) || (c.customer_id || '').toLowerCase().includes(term);
