@@ -154,11 +154,6 @@ router.post('/manual-screen', authenticateToken, screeningLimiter, async (req, r
   try {
     let payload = { ...req.body };
 
-    const apiKey = process.env.AMLWATCHER_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({ error: 'AML Watcher API Key is not configured on the server.' });
-    }
-
     if (payload.exact_search) {
       payload.match_score = 100;
     }
@@ -189,18 +184,13 @@ router.post('/manual-screen', authenticateToken, screeningLimiter, async (req, r
     };
     cleanObject(payload);
 
-    // AML Watcher /api/search expects api_key in the request body
-    payload.api_key = apiKey;
-
-    const response = await axios.post('https://api.amlwatcher.com/api/search', payload, {
-      headers: { 'Content-Type': 'application/json' }
-    });
-
-    res.json({ success: true, screeningResult: response.data });
+    // Use proper two-step Bearer token auth via amlWatcherRequest
+    const amlResult = await amlWatcherRequest('/api/search', payload, 'POST');
+    res.json({ success: true, screeningResult: amlResult });
   } catch (err) {
-    if (err.response) {
-      console.error('Manual Screening API Error:', err.response.status, err.response.data);
-      return res.status(err.response.status).json({ error: err.response.data.message || err.response.data.detail || 'API request failed', details: err.response.data });
+    if (err.message && err.message.includes('AML')) {
+      console.error('Manual Screening error:', err.message);
+      return res.status(400).json({ error: err.message });
     }
     console.error('Manual Screening error:', err);
     res.status(500).json({ error: 'Failed to screen via AML Watcher' });
