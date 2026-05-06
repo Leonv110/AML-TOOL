@@ -6,25 +6,37 @@
 
 import { apiGet, apiPost, getToken } from '../apiClient';
 
-const HMAC_SECRET = import.meta.env.VITE_AUDIT_HMAC_SECRET;
-if (!HMAC_SECRET) {
-  console.warn('⚠️ VITE_AUDIT_HMAC_SECRET is not set — audit log integrity verification will be weakened');
+const HMAC_SECRET = import.meta.env.VITE_AUDIT_HMAC_SECRET || 'gafa-default-audit-key-change-in-production';
+if (!import.meta.env.VITE_AUDIT_HMAC_SECRET) {
+  console.warn('⚠️ VITE_AUDIT_HMAC_SECRET is not set — using default key. Set this in Vercel env vars for production.');
 }
 
 // --- HMAC-SHA256 using Web Crypto API ---
 async function computeHMAC(message) {
-  const encoder = new TextEncoder();
-  const keyData = encoder.encode(HMAC_SECRET);
-  const msgData = encoder.encode(message);
+  try {
+    const encoder = new TextEncoder();
+    const keyData = encoder.encode(HMAC_SECRET);
+    const msgData = encoder.encode(message);
 
-  const cryptoKey = await crypto.subtle.importKey(
-    'raw', keyData, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
-  );
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw', keyData, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+    );
 
-  const signature = await crypto.subtle.sign('HMAC', cryptoKey, msgData);
-  return Array.from(new Uint8Array(signature))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
+    const signature = await crypto.subtle.sign('HMAC', cryptoKey, msgData);
+    return Array.from(new Uint8Array(signature))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+  } catch (err) {
+    console.warn('HMAC computation failed, using hash fallback:', err.message);
+    // Fallback: simple hash for environments where Web Crypto fails
+    let hash = 0;
+    for (let i = 0; i < message.length; i++) {
+      const char = message.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash |= 0;
+    }
+    return Math.abs(hash).toString(16).padStart(16, '0');
+  }
 }
 
 // --- Extract user info from JWT token (without library) ---
