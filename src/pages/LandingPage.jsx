@@ -3,15 +3,38 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Shield, BarChart3, Search, Database, ChevronRight, Lock, Globe, Activity, Mail, Linkedin, Twitter, MapPin, Phone, ChevronDown, ChevronUp } from 'lucide-react';
 import './LandingPage.css';
 
+// Default content (fallback if JSON fails to load)
+const DEFAULTS = {
+  hero: { badge: 'Next-Gen Forensic Intelligence', title: 'Forensic Intelligence', titleAccent: 'Reimagined', subtitle: 'The Global Association of Forensic Accountants (GAFA) provides elite Anti-Money Laundering tools driven by advanced ML ensembles and real-time transaction monitoring.', primaryCta: 'Get Started Now', secondaryCta: 'Join CAML', secondaryCtaLink: 'https://www.gafa.org.in' },
+  about: { title: 'About GAFA AML', paragraphs: ['The Global Association of Forensic Accountants (GAFA) has designed this flagship Anti-Money Laundering (AML) platform to bridge the gap between theoretical forensic accounting and practical, AI-driven threat detection.', 'Built specifically for certified Anti Money Laundering Professionals, Compliance officers and forensic accounting professionals, GAFA AML platform leverages Technology integration in Anti money laundering. The AI agents are used to analyze complex transaction networks, identifying layering and smurfing techniques that traditional rule sets fail to capture.'], stats: [{ number: '30+', label: 'Real-World AML Case Studies' }, { number: '20+', label: 'Practical Monitoring Assignments' }, { number: '5+', label: 'Global AML Frameworks (FATF, RBI, EU AMLD)' }], securityTitle: 'Bank-grade Security', securitySubtitle: 'E2E Encrypted Forensic Ledgers' },
+  features: { title: 'Core Capabilities', subtitle: 'Enterprise-grade tools for modern AML', items: [{ icon: 'Search', title: 'Advanced ML Detection', description: 'Advanced anomaly detection with AI to identify suspicious patterns that traditional rule-based systems miss.' }, { icon: 'BarChart3', title: 'Real-time Analytics', description: 'Visualize complex transaction webs and identify layered money movements instantly.' }, { icon: 'Lock', title: 'Regulatory Compliance', description: 'Built to align with global AML/CFT requirements and reporting standards.' }] },
+  trust: { title: 'Global Standards. Local Precision.', description: 'GAFA engages with partner networks collectively handling significant transaction volumes, supporting transparency and stronger financial oversight practices.' },
+  faq: { title: 'Frequently Asked Questions', subtitle: 'Everything you need to know about the GAFA platform.', items: [{ question: 'Who is this platform designed for?', answer: "It is built for students and professionals enrolled in GAFA's CAML program, especially those in banking, compliance, audit, and financial investigation roles." }, { question: 'How does the detection work?', answer: 'The platform combines rule-based scenarios with basic machine learning models to simulate real transaction monitoring, helping learners identify suspicious patterns and risk indicators.' }, { question: 'Is the data secure?', answer: 'Yes. The platform uses simulated and anonymized data with strong security controls, ensuring a safe training environment without real customer exposure.' }, { question: 'Can learners practice on the platform?', answer: 'Yes. A sandbox environment allows users to analyze mock transactions, generate alerts, and perform investigations in a risk-free setting.' }] },
+  footer: { brandDescription: 'Advancing forensic financial analysis through intelligent monitoring, real-time risk detection, and globally aligned compliance standards.', email: 'info@gafa.org.in', website: 'www.gafa.org.in', copyright: 'Global Association of Forensic Accountants' },
+};
+
+const ICON_MAP = { Search, BarChart3, Database, Lock };
+
 export default function LandingPage() {
   const navigate = useNavigate();
   const [scrolled, setScrolled] = useState(false);
+  const [content, setContent] = useState(DEFAULTS);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Load editable content from JSON (team can edit public/landing-content.json)
+  useEffect(() => {
+    fetch('/landing-content.json')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setContent(prev => ({ ...prev, ...data })); })
+      .catch(() => { /* silently use defaults */ });
+  }, []);
+
+  const c = content;
 
   return (
     <div className="landing-wrapper">
@@ -42,23 +65,22 @@ export default function LandingPage() {
           <div className="hero-content">
             <div className="hero-badge">
               <Activity size={14} className="pulse" />
-              <span>Next-Gen Forensic Intelligence</span>
+              <span>{c.hero?.badge || DEFAULTS.hero.badge}</span>
             </div>
             <h1 className="hero-title text-gradient">
-              Forensic Intelligence <br />
-              <span className="accent-gradient">Reimagined</span>
+              {c.hero?.title || DEFAULTS.hero.title} <br />
+              <span className="accent-gradient">{c.hero?.titleAccent || DEFAULTS.hero.titleAccent}</span>
             </h1>
             <p className="hero-subtitle">
-              The Global Association of Forensic Accountants (GAFA) provides elite Anti-Money Laundering tools 
-              driven by advanced ML ensembles and real-time transaction monitoring.
+              {c.hero?.subtitle || DEFAULTS.hero.subtitle}
             </p>
             <div className="hero-actions">
               <button onClick={() => navigate('/login')} className="gafa-btn gafa-btn-primary">
-                Get Started Now <ChevronRight size={18} />
+                {c.hero?.primaryCta || DEFAULTS.hero.primaryCta} <ChevronRight size={18} />
               </button>
-              <button onClick={() => navigate('/terms')} className="gafa-btn glass-card">
-                View Governance
-              </button>
+              <a href={c.hero?.secondaryCtaLink || DEFAULTS.hero.secondaryCtaLink} target="_blank" rel="noopener noreferrer" className="gafa-btn glass-card">
+                {c.hero?.secondaryCta || DEFAULTS.hero.secondaryCta}
+              </a>
             </div>
           </div>
           
@@ -72,33 +94,24 @@ export default function LandingPage() {
       <section id="about" className="about-section">
         <div className="about-container glass-panel">
           <div className="about-content">
-            <h2 className="text-gradient">About GAFA AML</h2>
-            <p>
-              The Global Association of Forensic Accountants (GAFA) has designed this flagship Anti-Money Laundering (AML) platform to bridge the gap between theoretical forensic accounting and practical, AI-driven threat detection.
-            </p>
-            <p>
-              Built specifically for certified financial auditors, regulatory agencies, and forensic accounting students, our platform leverages massive parallel processing to analyze complex transaction networks, identifying layering and smurfing techniques that traditional rule sets fail to capture.
-            </p>
+            <h2 className="text-gradient">{c.about?.title || DEFAULTS.about.title}</h2>
+            {(c.about?.paragraphs || DEFAULTS.about.paragraphs).map((p, i) => (
+              <p key={i}>{p}</p>
+            ))}
             <div className="about-stats">
-              <div className="stat-item">
-                <span className="stat-number">99.2%</span>
-                <span className="stat-label">Anomaly Detection Accuracy</span>
-              </div>
-              <div className="stat-item">
-                <span className="stat-number">&lt; 50ms</span>
-                <span className="stat-label">Real-time Inference</span>
-              </div>
-              <div className="stat-item">
-                <span className="stat-number">Global</span>
-                <span className="stat-label">Regulatory Compliance</span>
-              </div>
+              {(c.about?.stats || DEFAULTS.about.stats).map((stat, i) => (
+                <div className="stat-item" key={i}>
+                  <span className="stat-number">{stat.number}</span>
+                  <span className="stat-label">{stat.label}</span>
+                </div>
+              ))}
             </div>
           </div>
           <div className="about-visual">
              <div className="glass-card compliance-badge">
                 <Shield size={64} className="accent-gradient pulse" />
-                <h3>Bank-grade Security</h3>
-                <p>E2E Encrypted Forensic Ledgers</p>
+                <h3>{c.about?.securityTitle || DEFAULTS.about.securityTitle}</h3>
+                <p>{c.about?.securitySubtitle || DEFAULTS.about.securitySubtitle}</p>
              </div>
           </div>
         </div>
@@ -107,30 +120,21 @@ export default function LandingPage() {
       {/* Features Grid */}
       <section id="features" className="features-section">
         <div className="section-header">
-          <h2 className="text-gradient">Core Capabilities</h2>
-          <p>Enterprise-grade tools for modern financial investigators</p>
+          <h2 className="text-gradient">{c.features?.title || DEFAULTS.features.title}</h2>
+          <p>{c.features?.subtitle || DEFAULTS.features.subtitle}</p>
         </div>
         <div className="features-grid">
-          <FeatureCard 
-            icon={<Search size={24} />}
-            title="Advanced ML Detection"
-            desc="Isolation Forest ensembles detect anomalies that traditional rule-based systems miss."
-          />
-          <FeatureCard 
-            icon={<BarChart3 size={24} />}
-            title="Real-time Analytics"
-            desc="Visualize complex transaction webs and identify layered money movements instantly."
-          />
-          <FeatureCard 
-            icon={<Database size={24} />}
-            title="Secure Data Vault"
-            desc="Military-grade encryption for sensitive forensic reports and evidence logs."
-          />
-          <FeatureCard 
-            icon={<Lock size={24} />}
-            title="Regulatory Compliance"
-            desc="Built to align with global AML/CFT requirements and reporting standards."
-          />
+          {(c.features?.items || DEFAULTS.features.items).map((feat, i) => {
+            const IconComp = ICON_MAP[feat.icon] || Search;
+            return (
+              <FeatureCard 
+                key={i}
+                icon={<IconComp size={24} />}
+                title={feat.title}
+                desc={feat.description}
+              />
+            );
+          })}
         </div>
       </section>
 
@@ -138,37 +142,21 @@ export default function LandingPage() {
       <section id="compliance" className="trust-section">
         <div className="glass-panel trust-box">
           <Globe size={48} className="trust-icon" />
-          <h3>Global Standards. Local Precision.</h3>
-          <p>
-            GAFA monitors over $50B in transaction volume through our partner networks, 
-            ensuring that financial ecosystems remain transparent and secure.
-          </p>
+          <h3>{c.trust?.title || DEFAULTS.trust.title}</h3>
+          <p>{c.trust?.description || DEFAULTS.trust.description}</p>
         </div>
       </section>
 
       {/* FAQ Section */}
       <section id="faq" className="faq-section">
         <div className="section-header">
-          <h2 className="text-gradient">Frequently Asked Questions</h2>
-          <p>Everything you need to know about the GAFA platform.</p>
+          <h2 className="text-gradient">{c.faq?.title || DEFAULTS.faq.title}</h2>
+          <p>{c.faq?.subtitle || DEFAULTS.faq.subtitle}</p>
         </div>
         <div className="faq-grid">
-           <FaqItem 
-              question="Who is this platform built for?" 
-              answer="It is designed exclusively for certified forensic accountants, AML compliance officers at financial institutions, and students enrolled in GAFA certification programs." 
-           />
-           <FaqItem 
-              question="How does the AI detection work?" 
-              answer="We utilize an Isolation Forest Ensemble trained on vast, anonymized global transaction datasets. It identifies complex patterns of layering and geographic anomalies that trigger risk alerts before human auditors even look at the data." 
-           />
-           <FaqItem 
-              question="Is my forensic data secure?" 
-              answer="Absolutely. All data ingested for investigation is processed using AES-256 encryption. We comply with strict data residency laws and automatically scrub PII during bulk AI inference tasks." 
-           />
-           <FaqItem 
-              question="Can I test the platform?" 
-              answer="If you are a registered user, you can use the 'Student Portal' login role to access isolated sandbox environments filled with generated mock financial records for training purposes." 
-           />
+          {(c.faq?.items || DEFAULTS.faq.items).map((item, i) => (
+            <FaqItem key={i} question={item.question} answer={item.answer} />
+          ))}
         </div>
       </section>
 
@@ -182,12 +170,12 @@ export default function LandingPage() {
                 <span className="logo-text">GAFA AML</span>
               </div>
               <p className="brand-desc">
-                Pioneering the future of forensic financial analysis with intelligent, real-time threat detection and comprehensive global compliance.
+                {c.footer?.brandDescription || DEFAULTS.footer.brandDescription}
               </p>
               <div className="social-links">
                 <a href="#" aria-label="LinkedIn"><Linkedin size={20} /></a>
                 <a href="#" aria-label="Twitter"><Twitter size={20} /></a>
-                <a href="mailto:contact@gafa.org" aria-label="Email"><Mail size={20} /></a>
+                <a href={`mailto:${c.footer?.email || DEFAULTS.footer.email}`} aria-label="Email"><Mail size={20} /></a>
               </div>
             </div>
             
@@ -217,10 +205,10 @@ export default function LandingPage() {
           </div>
           
           <div className="footer-bottom">
-            <p>© {new Date().getFullYear()} Global Association of Forensic Accountants. All rights reserved.</p>
+            <p>© {new Date().getFullYear()} {c.footer?.copyright || DEFAULTS.footer.copyright}. All rights reserved.</p>
             <div className="contact-info">
-              <span><MapPin size={14}/> GAFA HQ, Mumbai, India</span>
-              <span><Phone size={14}/> +91 (22) 1234 5678</span>
+              <span><Mail size={14}/> {c.footer?.email || DEFAULTS.footer.email}</span>
+              <span><Globe size={14}/> <a href={`https://${c.footer?.website || DEFAULTS.footer.website}`} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>{c.footer?.website || DEFAULTS.footer.website}</a></span>
             </div>
           </div>
         </div>

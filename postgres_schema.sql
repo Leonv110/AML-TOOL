@@ -198,12 +198,17 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   entity_id TEXT,
   metadata JSONB,
   timestamp TIMESTAMPTZ DEFAULT now() NOT NULL,
-  hmac_signature TEXT NOT NULL
+  hmac_signature TEXT NOT NULL,
+  prev_hash TEXT,
+  sequence_number BIGSERIAL
 );
 
 -- Index for common queries
 CREATE INDEX IF NOT EXISTS idx_audit_logs_event_type ON audit_logs(event_type);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_sequence ON audit_logs(sequence_number);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_actor ON audit_logs(actor_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_actor_time ON audit_logs(actor_id, timestamp);
 
 -- ============================================================
 -- 9. REPORTS TABLE (report history metadata)

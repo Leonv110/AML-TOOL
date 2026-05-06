@@ -1,5 +1,6 @@
 // ============================================================
 // auditService.js — Audit Logging with HMAC-SHA256 Integrity
+// + Hash Chain, Analytics, Session Forensics, FIU-IND Export
 // Uses Web Crypto API (built-in, no npm dependency needed)
 // ============================================================
 
@@ -110,4 +111,166 @@ export async function fetchAuditLogs(filters = {}) {
   } catch {
     return [];
   }
+}
+
+// ============================================================
+// Pillar 1: Hash Chain Functions
+// ============================================================
+
+export async function fetchChainStatus() {
+  try {
+    return await apiGet('/api/audit/chain/verify');
+  } catch {
+    return { intact: false, total_entries: 0, breaks: [], gaps: [], error: true };
+  }
+}
+
+export async function fetchChainExport(from, to) {
+  try {
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    const qs = params.toString();
+    return await apiGet(`/api/audit/chain/export${qs ? `?${qs}` : ''}`);
+  } catch {
+    return null;
+  }
+}
+
+// ============================================================
+// Pillar 2: Rule Effectiveness
+// ============================================================
+
+export async function fetchRuleEffectiveness() {
+  try {
+    return await apiGet('/api/audit/analytics/rule-effectiveness');
+  } catch {
+    return [];
+  }
+}
+
+// ============================================================
+// Pillar 3: Analyst Behavior
+// ============================================================
+
+export async function fetchAnalystBehavior() {
+  try {
+    return await apiGet('/api/audit/analytics/analyst-behavior');
+  } catch {
+    return [];
+  }
+}
+
+// ============================================================
+// Pillar 4: Compliance Score
+// ============================================================
+
+export async function fetchComplianceScore() {
+  try {
+    return await apiGet('/api/audit/analytics/compliance-score');
+  } catch {
+    return { overall_score: 0, components: {}, gaps: [] };
+  }
+}
+
+// ============================================================
+// Pillar 5: Session Forensics
+// ============================================================
+
+export async function fetchSessionTimeline(actorId, from, to) {
+  try {
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    const qs = params.toString();
+    return await apiGet(`/api/audit/session/${actorId}${qs ? `?${qs}` : ''}`);
+  } catch {
+    return { sessions: [] };
+  }
+}
+
+// ============================================================
+// Pillar 6: FIU-IND PDF Export
+// ============================================================
+
+export async function generateFIUReport(logs, chainStatus, dateRange) {
+  // Import jsPDF and autoTable
+  const jsPDFModule = await import('jspdf');
+  const jsPDF = jsPDFModule.default || jsPDFModule.jsPDF;
+  const autoTableModule = await import('jspdf-autotable');
+  
+  // jspdf-autotable attaches itself as a plugin automatically when imported
+
+  const doc = new jsPDF('p', 'mm', 'a4');
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const now = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+
+  // --- Cover Page ---
+  doc.setFillColor(13, 17, 23);
+  doc.rect(0, 0, pageWidth, 297, 'F');
+
+  doc.setTextColor(245, 158, 11);
+  doc.setFontSize(28);
+  doc.text('GAFA AML Platform', pageWidth / 2, 60, { align: 'center' });
+
+  doc.setTextColor(226, 232, 240);
+  doc.setFontSize(16);
+  doc.text('Audit Trail Report', pageWidth / 2, 75, { align: 'center' });
+  doc.setFontSize(11);
+  doc.text('For FIU-IND Submission under PMLA Section 12', pageWidth / 2, 85, { align: 'center' });
+
+  doc.setFontSize(10);
+  doc.setTextColor(148, 163, 184);
+  const coverInfo = [
+    `Institution: GAFA AML Training Platform`,
+    `Report Period: ${dateRange.from || 'All time'} — ${dateRange.to || 'Present'}`,
+    `Generated At: ${now}`,
+    `Total Entries: ${logs.length}`,
+    `Chain Integrity: ${chainStatus.intact ? 'INTACT ✓' : 'COMPROMISED ✗'}`,
+    `Chain Breaks: ${chainStatus.breaks?.length || 0}`,
+    `Sequence Gaps: ${chainStatus.gaps?.length || 0}`,
+  ];
+  coverInfo.forEach((line, i) => doc.text(line, pageWidth / 2, 110 + i * 8, { align: 'center' }));
+
+  // Master hash
+  doc.setFontSize(8);
+  doc.setTextColor(100, 116, 139);
+  const content = JSON.stringify(logs.map(l => l.hmac_signature || ''));
+  const masterHash = await computeHMAC(content);
+  doc.text(`Document Digital Signature (HMAC-SHA256):`, pageWidth / 2, 200, { align: 'center' });
+  doc.text(masterHash, pageWidth / 2, 207, { align: 'center' });
+
+  // --- Event Table Pages ---
+  doc.addPage();
+  doc.setFillColor(13, 17, 23);
+  doc.rect(0, 0, pageWidth, 297, 'F');
+  doc.setTextColor(226, 232, 240);
+  doc.setFontSize(14);
+  doc.text('Chronological Audit Trail', 14, 20);
+
+  // Use autoTable (attached to doc prototype by the import)
+  doc.autoTable({
+    startY: 28,
+    head: [['#', 'Timestamp', 'Event Type', 'Actor', 'Entity', 'HMAC Status']],
+    body: logs.map((log, i) => [
+      i + 1,
+      new Date(log.timestamp).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
+      log.event_type || '—',
+      log.actor_role || '—',
+      log.entity_type ? `${log.entity_type}:${log.entity_id || ''}` : '—',
+      log.hmac_signature ? '✓ Signed' : '✗ Missing'
+    ]),
+    theme: 'grid',
+    styles: { fontSize: 7, cellPadding: 2, textColor: [200, 200, 200], fillColor: [13, 17, 23], lineColor: [40, 40, 50] },
+    headStyles: { fillColor: [30, 35, 50], textColor: [245, 158, 11], fontSize: 7 },
+    alternateRowStyles: { fillColor: [18, 22, 30] },
+    pageBreak: 'auto',
+    didDrawPage: (data) => {
+      // Dark background on every new page
+      doc.setFillColor(13, 17, 23);
+      doc.rect(0, 0, pageWidth, 297, 'F');
+    },
+  });
+
+  doc.save(`GAFA_Audit_Report_${new Date().toISOString().split('T')[0]}.pdf`);
 }

@@ -44,3 +44,8 @@ api-server/test_api.js
 api-server/test_db.js
 screening/
 
+
+# Local reports
+CODEBASE_RESCUE_REPORT.md
+EXISTING_REPO_RESCUE.md
+gafa_implementation_report.md

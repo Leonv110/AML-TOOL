@@ -27,19 +27,10 @@ const router = express.Router();
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const { status } = req.query;
-    const userId = req.user.id;
-    const isAdmin = req.user.role === 'admin';
 
-    let query, params, idx;
-    if (isAdmin) {
-      query = 'SELECT * FROM alerts WHERE 1=1';
-      params = [];
-      idx = 1;
-    } else {
-      query = 'SELECT * FROM alerts WHERE (uploaded_by = $1 OR uploaded_by IS NULL)';
-      params = [userId];
-      idx = 2;
-    }
+    let query = 'SELECT * FROM alerts WHERE 1=1';
+    const params = [];
+    let idx = 1;
 
     if (status && status !== 'all') {
       query += ` AND status = $${idx++}`;
@@ -56,12 +47,12 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-// GET /api/alerts/customer/:customerId — alerts for a customer (user-scoped)
+// GET /api/alerts/customer/:customerId — alerts for a customer
 router.get('/customer/:customerId', authenticateToken, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      'SELECT * FROM alerts WHERE customer_id = $1 AND (uploaded_by = $2 OR uploaded_by IS NULL) ORDER BY created_at DESC',
-      [req.params.customerId, req.user.id]
+      'SELECT * FROM alerts WHERE customer_id = $1 ORDER BY created_at DESC',
+      [req.params.customerId]
     );
     res.json(rows);
   } catch (err) {
@@ -70,12 +61,12 @@ router.get('/customer/:customerId', authenticateToken, async (req, res) => {
   }
 });
 
-// GET /api/alerts/count/:ruleName — count alerts by rule (user-scoped)
+// GET /api/alerts/count/:ruleName — count alerts by rule
 router.get('/count/:ruleName', authenticateToken, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      'SELECT COUNT(*) as count FROM alerts WHERE rule_triggered = $1 AND (uploaded_by = $2 OR uploaded_by IS NULL)',
-      [req.params.ruleName, req.user.id]
+      'SELECT COUNT(*) as count FROM alerts WHERE rule_triggered = $1',
+      [req.params.ruleName]
     );
     res.json({ count: parseInt(rows[0].count, 10) });
   } catch (err) {
@@ -84,13 +75,10 @@ router.get('/count/:ruleName', authenticateToken, async (req, res) => {
   }
 });
 
-// GET /api/alerts/rule-summary — get rule_triggered values (user-scoped)
+// GET /api/alerts/rule-summary — get rule_triggered values
 router.get('/rule-summary', authenticateToken, async (req, res) => {
   try {
-    const { rows } = await pool.query(
-      'SELECT rule_triggered FROM alerts WHERE (uploaded_by = $1 OR uploaded_by IS NULL)',
-      [req.user.id]
-    );
+    const { rows } = await pool.query('SELECT rule_triggered FROM alerts');
     res.json(rows);
   } catch (err) {
     console.error('Fetch rule summary error:', err);
@@ -125,8 +113,8 @@ router.patch('/:alertId/status', authenticateToken, async (req, res) => {
 
     // Guard: prevent duplicate status change
     const existing = await pool.query(
-      'SELECT status FROM alerts WHERE alert_id = $1 AND (uploaded_by = $2 OR uploaded_by IS NULL)',
-      [req.params.alertId, req.user.id]
+      'SELECT status FROM alerts WHERE alert_id = $1',
+      [req.params.alertId]
     );
     if (existing.rows.length > 0 && existing.rows[0].status === status) {
       return res.json({ success: true, message: 'Alert already in this status' });
@@ -141,8 +129,8 @@ router.patch('/:alertId/status', authenticateToken, async (req, res) => {
       params.push(case_id);
     }
 
-    query += ` WHERE alert_id = $${idx++} AND (uploaded_by = $${idx++} OR uploaded_by IS NULL)`;
-    params.push(req.params.alertId, req.user.id);
+    query += ` WHERE alert_id = $${idx++}`;
+    params.push(req.params.alertId);
 
     await pool.query(query, params);
     res.json({ success: true });
@@ -245,18 +233,7 @@ router.post('/', authenticateToken, async (req, res) => {
  */
 router.delete('/', authenticateToken, async (req, res) => {
   try {
-    const isAdmin = req.user.role === 'admin';
-    let query, params;
-
-    if (isAdmin) {
-      query = 'DELETE FROM alerts';
-      params = [];
-    } else {
-      query = 'DELETE FROM alerts WHERE (uploaded_by = $1 OR uploaded_by IS NULL)';
-      params = [req.user.id];
-    }
-
-    const result = await pool.query(query, params);
+    const result = await pool.query('DELETE FROM alerts WHERE uploaded_by = $1', [req.user.id]);
     console.log(`[Reset] Deleted ${result.rowCount} alerts (user: ${req.user.email})`);
     res.json({ deleted: result.rowCount });
   } catch (err) {
