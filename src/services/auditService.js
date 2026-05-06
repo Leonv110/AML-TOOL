@@ -201,88 +201,307 @@ export async function fetchSessionTimeline(actorId, from, to) {
   }
 }
 
-// ============================================================
-// Pillar 6: FIU-IND PDF Export
+// ====================================================// Pillar 6: FIU-IND PDF Export
+// Matches reportGenerator.js professional style
 // ============================================================
 
 export async function generateFIUReport(logs, chainStatus, dateRange) {
-  // Import jsPDF and autoTable
   const jsPDFModule = await import('jspdf');
   const jsPDF = jsPDFModule.default || jsPDFModule.jsPDF;
-  const autoTableModule = await import('jspdf-autotable');
-  
-  // jspdf-autotable attaches itself as a plugin automatically when imported
+  await import('jspdf-autotable');
 
   const doc = new jsPDF('p', 'mm', 'a4');
   const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
   const now = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+  const refDate = new Date();
+  const refNumber = `AUD-${refDate.getFullYear()}${String(refDate.getMonth() + 1).padStart(2, '0')}${String(refDate.getDate()).padStart(2, '0')}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
-  // --- Cover Page ---
-  doc.setFillColor(13, 17, 23);
-  doc.rect(0, 0, pageWidth, 297, 'F');
+  // --- Helper: Logo ---
+  let logoBase64 = null;
+  try {
+    const res = await fetch('/logo.webp');
+    if (res.ok) {
+      const blob = await res.blob();
+      logoBase64 = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(blob);
+      });
+    }
+  } catch {}
 
-  doc.setTextColor(245, 158, 11);
-  doc.setFontSize(28);
-  doc.text('GAFA AML Platform', pageWidth / 2, 60, { align: 'center' });
+  // --- Helper: Header ---
+  function addHeader(title) {
+    doc.setFillColor(14, 25, 48);
+    doc.rect(0, 0, pageWidth, 45, 'F');
+    doc.setFillColor(14, 179, 167);
+    doc.rect(0, 45, pageWidth, 2, 'F');
 
-  doc.setTextColor(226, 232, 240);
-  doc.setFontSize(16);
-  doc.text('Audit Trail Report', pageWidth / 2, 75, { align: 'center' });
-  doc.setFontSize(11);
-  doc.text('For FIU-IND Submission under PMLA Section 12', pageWidth / 2, 85, { align: 'center' });
+    if (logoBase64) {
+      doc.addImage(logoBase64, 'WEBP', 15, 10, 25, 25);
+    } else {
+      doc.setFillColor(255, 255, 255);
+      doc.circle(27, 22, 10, 'F');
+      doc.setFillColor(14, 179, 167);
+      doc.circle(27, 22, 5, 'F');
+    }
 
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text('GAFA Academy', 45, 18);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(180, 180, 180);
+    doc.text('Global Anti-Financial Crime Academy  |  FIU Reg: FIU-IND/XXXXX/2024', 45, 26);
+    doc.setFontSize(10);
+    doc.setTextColor(200, 200, 200);
+    doc.text(`Ref: ${refNumber}`, pageWidth - 15, 18, { align: 'right' });
+    doc.setFontSize(8);
+    doc.text(now, pageWidth - 15, 26, { align: 'right' });
+
+    doc.setFillColor(41, 65, 105);
+    doc.rect(15, 52, pageWidth - 30, 12, 'F');
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text(title, pageWidth / 2, 60, { align: 'center' });
+    return 75;
+  }
+
+  // --- Helper: Footer ---
+  function addFooter(pageNum, totalPages) {
+    doc.setDrawColor(200);
+    doc.line(15, pageHeight - 20, pageWidth - 15, pageHeight - 20);
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(120);
+    doc.text('GAFA Academy — Confidential', 15, pageHeight - 14);
+    doc.text(`Page ${pageNum} of ${totalPages}`, pageWidth / 2, pageHeight - 14, { align: 'center' });
+    doc.text(`Compliance Officer: GAFA AML`, pageWidth - 15, pageHeight - 14, { align: 'right' });
+  }
+
+  // ==============================
+  // PAGE 1: Header + Executive Summary + Chain Integrity
+  // ==============================
+  let y = addHeader('FIU-IND AUDIT TRAIL REPORT — PMLA §12');
+
+  // Section 1: Executive Summary
   doc.setFontSize(10);
-  doc.setTextColor(148, 163, 184);
-  const coverInfo = [
-    `Institution: GAFA AML Training Platform`,
-    `Report Period: ${dateRange.from || 'All time'} — ${dateRange.to || 'Present'}`,
-    `Generated At: ${now}`,
-    `Total Entries: ${logs.length}`,
-    `Chain Integrity: ${chainStatus.intact ? 'INTACT ✓' : 'COMPROMISED ✗'}`,
-    `Chain Breaks: ${chainStatus.breaks?.length || 0}`,
-    `Sequence Gaps: ${chainStatus.gaps?.length || 0}`,
-  ];
-  coverInfo.forEach((line, i) => doc.text(line, pageWidth / 2, 110 + i * 8, { align: 'center' }));
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(41, 65, 105);
+  doc.text('1. EXECUTIVE SUMMARY', 15, y);
+  y += 6;
 
-  // Master hash
-  doc.setFontSize(8);
-  doc.setTextColor(100, 116, 139);
+  const summaryData = [
+    ['Report Reference', refNumber],
+    ['Reporting Period', `${dateRange.from || 'All time'} — ${dateRange.to || 'Present'}`],
+    ['Generated At', now],
+    ['Total Audit Entries', String(logs.length)],
+    ['Unique Event Types', String(new Set(logs.map(l => l.event_type)).size)],
+    ['Unique Actors', String(new Set(logs.map(l => l.actor_id).filter(Boolean)).size)],
+    ['Regulatory Basis', 'PMLA Section 12(1)(a) — Record Keeping'],
+  ];
+
+  doc.autoTable({
+    startY: y,
+    body: summaryData,
+    theme: 'plain',
+    styles: { fontSize: 8, cellPadding: 3 },
+    columnStyles: {
+      0: { fontStyle: 'bold', cellWidth: 55, textColor: [80, 80, 80] },
+      1: { textColor: [0, 0, 0], fontStyle: 'bold' },
+    },
+    margin: { left: 15, right: 15 },
+  });
+  y = doc.lastAutoTable.finalY + 10;
+
+  // Section 2: Chain Integrity
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(41, 65, 105);
+  doc.text('2. HASH CHAIN INTEGRITY VERIFICATION', 15, y);
+  y += 6;
+
+  const integrityColor = chainStatus.intact ? [34, 139, 34] : [180, 40, 40];
+  const chainData = [
+    ['Chain Status', chainStatus.intact ? 'INTACT ✓ — No tampering detected' : 'COMPROMISED ✗ — Integrity issues found'],
+    ['Total Entries Verified', String(chainStatus.total_entries || logs.length)],
+    ['Chain Breaks', String(chainStatus.breaks?.length || 0)],
+    ['Sequence Gaps', String(chainStatus.gaps?.length || 0)],
+    ['Algorithm', 'HMAC-SHA256 (Web Crypto API)'],
+    ['Linking Method', 'Sequential hash chaining (prev_hash → current)'],
+  ];
+
+  doc.autoTable({
+    startY: y,
+    body: chainData,
+    theme: 'plain',
+    styles: { fontSize: 8, cellPadding: 3 },
+    columnStyles: {
+      0: { fontStyle: 'bold', cellWidth: 55, textColor: [80, 80, 80] },
+      1: { textColor: integrityColor, fontStyle: 'bold' },
+    },
+    margin: { left: 15, right: 15 },
+  });
+  y = doc.lastAutoTable.finalY + 10;
+
+  // Section 3: Event Distribution
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(41, 65, 105);
+  doc.text('3. EVENT TYPE DISTRIBUTION', 15, y);
+  y += 6;
+
+  const eventCounts = {};
+  logs.forEach(l => {
+    const t = l.event_type || 'UNKNOWN';
+    eventCounts[t] = (eventCounts[t] || 0) + 1;
+  });
+
+  const eventDistData = Object.entries(eventCounts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([type, count]) => [
+      type,
+      String(count),
+      `${((count / logs.length) * 100).toFixed(1)}%`,
+    ]);
+
+  doc.autoTable({
+    startY: y,
+    head: [['Event Type', 'Count', 'Percentage']],
+    body: eventDistData,
+    theme: 'grid',
+    styles: { fontSize: 7, cellPadding: 2 },
+    headStyles: { fillColor: [41, 65, 105], textColor: 255, fontSize: 7, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [245, 247, 250] },
+    columnStyles: {
+      1: { halign: 'center', fontStyle: 'bold' },
+      2: { halign: 'center' },
+    },
+    margin: { left: 15, right: 15 },
+  });
+  y = doc.lastAutoTable.finalY + 10;
+
+  // Digital Signature (master hash)
+  if (y > pageHeight - 50) {
+    doc.addPage();
+    y = 20;
+  }
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(41, 65, 105);
+  doc.text('4. DOCUMENT DIGITAL SIGNATURE', 15, y);
+  y += 6;
+
   const content = JSON.stringify(logs.map(l => l.hmac_signature || ''));
   const masterHash = await computeHMAC(content);
-  doc.text(`Document Digital Signature (HMAC-SHA256):`, pageWidth / 2, 200, { align: 'center' });
-  doc.text(masterHash, pageWidth / 2, 207, { align: 'center' });
 
-  // --- Event Table Pages ---
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(60);
+  doc.text('This document is digitally signed using HMAC-SHA256 over all audit entry signatures.', 15, y);
+  y += 5;
+  doc.text('Any modification to the underlying data will invalidate this signature.', 15, y);
+  y += 8;
+
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(80);
+  doc.text('Master Hash:', 15, y);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(41, 65, 105);
+  doc.text(masterHash, 42, y);
+
+  // ==============================
+  // NEXT PAGES: Chronological Audit Trail Table
+  // ==============================
   doc.addPage();
-  doc.setFillColor(13, 17, 23);
-  doc.rect(0, 0, pageWidth, 297, 'F');
-  doc.setTextColor(226, 232, 240);
-  doc.setFontSize(14);
-  doc.text('Chronological Audit Trail', 14, 20);
+  y = 20;
 
-  // Use autoTable (attached to doc prototype by the import)
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(41, 65, 105);
+  doc.text('5. CHRONOLOGICAL AUDIT TRAIL', 15, y);
+  y += 3;
+
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100);
+  doc.text(`${logs.length} entries ordered by timestamp. Each entry is independently HMAC-signed.`, 15, y + 3);
+  y += 8;
+
   doc.autoTable({
-    startY: 28,
-    head: [['#', 'Timestamp', 'Event Type', 'Actor', 'Entity', 'HMAC Status']],
+    startY: y,
+    head: [['#', 'Timestamp (IST)', 'Event Type', 'Actor Role', 'Entity', 'HMAC']],
     body: logs.map((log, i) => [
       i + 1,
       new Date(log.timestamp).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
       log.event_type || '—',
       log.actor_role || '—',
-      log.entity_type ? `${log.entity_type}:${log.entity_id || ''}` : '—',
-      log.hmac_signature ? '✓ Signed' : '✗ Missing'
+      log.entity_type ? `${log.entity_type}:${(log.entity_id || '').substring(0, 12)}` : '—',
+      log.hmac_signature ? '✓ Signed' : '✗ Missing',
     ]),
     theme: 'grid',
-    styles: { fontSize: 7, cellPadding: 2, textColor: [200, 200, 200], fillColor: [13, 17, 23], lineColor: [40, 40, 50] },
-    headStyles: { fillColor: [30, 35, 50], textColor: [245, 158, 11], fontSize: 7 },
-    alternateRowStyles: { fillColor: [18, 22, 30] },
-    pageBreak: 'auto',
-    didDrawPage: (data) => {
-      // Dark background on every new page
-      doc.setFillColor(13, 17, 23);
-      doc.rect(0, 0, pageWidth, 297, 'F');
+    styles: { fontSize: 6.5, cellPadding: 2 },
+    headStyles: { fillColor: [41, 65, 105], textColor: 255, fontSize: 7, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [245, 247, 250] },
+    columnStyles: {
+      0: { cellWidth: 10, halign: 'center' },
+      1: { cellWidth: 38 },
+      5: { halign: 'center', cellWidth: 18 },
     },
+    margin: { left: 15, right: 15 },
+  });
+  y = doc.lastAutoTable.finalY + 10;
+
+  // ==============================
+  // DECLARATION
+  // ==============================
+  if (y > pageHeight - 70) {
+    doc.addPage();
+    y = 20;
+  }
+
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(41, 65, 105);
+  doc.text('6. DECLARATION', 15, y);
+  y += 6;
+
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(0);
+  const declaration = [
+    'I hereby declare that the information provided in this Audit Trail Report is true and correct to the best of',
+    'my knowledge and belief. This report is generated in compliance with the Prevention of Money Laundering Act,',
+    '2002 (PMLA) and the rules and regulations issued by FIU-IND. The audit trail has been cryptographically verified',
+    'using HMAC-SHA256 hash chaining to ensure tamper-evidence.',
+    '',
+    '',
+    'Compliance Officer: _____________________',
+    '',
+    'Signature: _____________________',
+    '',
+    `Date: ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`,
+    '',
+    'Reviewed by: _____________________',
+  ];
+  declaration.forEach(line => {
+    doc.text(line, 15, y);
+    y += 4.5;
   });
 
-  doc.save(`GAFA_Audit_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+  // ==============================
+  // Add page numbers to all pages
+  // ==============================
+  const totalPages = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    addFooter(i, totalPages);
+  }
+
+  doc.save(`GAFA_FIU_Audit_Report_${refNumber}.pdf`);
 }
