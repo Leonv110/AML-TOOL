@@ -153,12 +153,11 @@ const screeningLimiter = rateLimit({
 router.post('/manual-screen', authenticateToken, screeningLimiter, async (req, res) => {
   try {
     let payload = { ...req.body };
-    const apiKey = process.env.AMLWATCHER_API_KEY;
 
+    const apiKey = process.env.AMLWATCHER_API_KEY;
     if (!apiKey) {
       return res.status(500).json({ error: 'AML Watcher API Key is not configured on the server.' });
     }
-    payload.api_key = apiKey;
 
     if (payload.exact_search) {
       payload.match_score = 100;
@@ -190,15 +189,20 @@ router.post('/manual-screen', authenticateToken, screeningLimiter, async (req, r
     };
     cleanObject(payload);
 
+    // Use header-based auth (Api-Key header), not body-based api_key
     const response = await axios.post('https://api.amlwatcher.com/api/search', payload, {
-      headers: { 'Content-Type': 'application/json' }
+      headers: {
+        'Content-Type': 'application/json',
+        'Api-Key': apiKey,
+        'Authorization': `Bearer ${apiKey}`
+      }
     });
 
     res.json({ success: true, screeningResult: response.data });
   } catch (err) {
     if (err.response) {
-      console.error('Manual Screening API Error:', err.response.data);
-      return res.status(err.response.status).json({ error: err.response.data.message || 'API request failed', details: err.response.data });
+      console.error('Manual Screening API Error:', err.response.status, err.response.data);
+      return res.status(err.response.status).json({ error: err.response.data.message || err.response.data.detail || 'API request failed', details: err.response.data });
     }
     console.error('Manual Screening error:', err);
     res.status(500).json({ error: 'Failed to screen via AML Watcher' });
