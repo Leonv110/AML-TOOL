@@ -189,13 +189,11 @@ router.post('/manual-screen', authenticateToken, screeningLimiter, async (req, r
     };
     cleanObject(payload);
 
-    // Use header-based auth (Api-Key header), not body-based api_key
+    // AML Watcher /api/search expects api_key in the request body
+    payload.api_key = apiKey;
+
     const response = await axios.post('https://api.amlwatcher.com/api/search', payload, {
-      headers: {
-        'Content-Type': 'application/json',
-        'Api-Key': apiKey,
-        'Authorization': `Bearer ${apiKey}`
-      }
+      headers: { 'Content-Type': 'application/json' }
     });
 
     res.json({ success: true, screeningResult: response.data });
