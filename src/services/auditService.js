@@ -194,8 +194,12 @@ export async function fetchSessionTimeline(actorId, from, to) {
 // ============================================================
 
 export async function generateFIUReport(logs, chainStatus, dateRange) {
-  const { default: jsPDF } = await import('jspdf');
-  await import('jspdf-autotable');
+  // Import jsPDF and autoTable
+  const jsPDFModule = await import('jspdf');
+  const jsPDF = jsPDFModule.default || jsPDFModule.jsPDF;
+  const autoTableModule = await import('jspdf-autotable');
+  
+  // jspdf-autotable attaches itself as a plugin automatically when imported
 
   const doc = new jsPDF('p', 'mm', 'a4');
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -231,24 +235,27 @@ export async function generateFIUReport(logs, chainStatus, dateRange) {
   // Master hash
   doc.setFontSize(8);
   doc.setTextColor(100, 116, 139);
-  const content = JSON.stringify(logs.map(l => l.hmac_signature));
+  const content = JSON.stringify(logs.map(l => l.hmac_signature || ''));
   const masterHash = await computeHMAC(content);
   doc.text(`Document Digital Signature (HMAC-SHA256):`, pageWidth / 2, 200, { align: 'center' });
   doc.text(masterHash, pageWidth / 2, 207, { align: 'center' });
 
   // --- Event Table Pages ---
   doc.addPage();
+  doc.setFillColor(13, 17, 23);
+  doc.rect(0, 0, pageWidth, 297, 'F');
   doc.setTextColor(226, 232, 240);
   doc.setFontSize(14);
   doc.text('Chronological Audit Trail', 14, 20);
 
+  // Use autoTable (attached to doc prototype by the import)
   doc.autoTable({
     startY: 28,
     head: [['#', 'Timestamp', 'Event Type', 'Actor', 'Entity', 'HMAC Status']],
     body: logs.map((log, i) => [
       i + 1,
       new Date(log.timestamp).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
-      log.event_type,
+      log.event_type || '—',
       log.actor_role || '—',
       log.entity_type ? `${log.entity_type}:${log.entity_id || ''}` : '—',
       log.hmac_signature ? '✓ Signed' : '✗ Missing'
@@ -257,6 +264,12 @@ export async function generateFIUReport(logs, chainStatus, dateRange) {
     styles: { fontSize: 7, cellPadding: 2, textColor: [200, 200, 200], fillColor: [13, 17, 23], lineColor: [40, 40, 50] },
     headStyles: { fillColor: [30, 35, 50], textColor: [245, 158, 11], fontSize: 7 },
     alternateRowStyles: { fillColor: [18, 22, 30] },
+    pageBreak: 'auto',
+    didDrawPage: (data) => {
+      // Dark background on every new page
+      doc.setFillColor(13, 17, 23);
+      doc.rect(0, 0, pageWidth, 297, 'F');
+    },
   });
 
   doc.save(`GAFA_Audit_Report_${new Date().toISOString().split('T')[0]}.pdf`);

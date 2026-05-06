@@ -78,9 +78,16 @@ export default function AuditLog() {
   };
 
   const handleExportPDF = async () => {
+    if (!logs || logs.length === 0) {
+      alert('No audit logs to export. Ensure logs are loaded first.');
+      return;
+    }
     setExportingPDF(true);
     try {
       await generateFIUReport(logs, chainStatus || { intact: true, breaks: [], gaps: [] }, { from: null, to: null });
+    } catch (err) {
+      console.error('PDF Export Error:', err);
+      alert(`PDF export failed: ${err.message}`);
     } finally { setExportingPDF(false); }
   };
 
