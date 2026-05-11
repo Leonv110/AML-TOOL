@@ -466,8 +466,4 @@ This platform implements controls mapped to:
 
 <div align="center">
 
-**Built for the GAFA CAML Program**
-
-Made with ☕ and compliance anxiety
-
 </div>
