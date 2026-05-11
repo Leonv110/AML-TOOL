@@ -200,8 +200,8 @@ One-click PDF generation for regulatory submission under PMLA Section 12:
 ### 1. Clone & Install
 
 ```bash
-git clone https://github.com/dhruvav322/GAFA.git
-cd GAFA
+git clone https://github.com/Leonv110/AML-TOOL.git
+cd AML-TOOL
 
 # Frontend dependencies
 npm install
