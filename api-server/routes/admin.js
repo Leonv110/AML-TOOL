@@ -251,9 +251,12 @@ router.delete('/users/:id', authenticateToken, requireAdmin, async (req, res) =>
     }
 
     await client.query('BEGIN');
-    // Delete profile first (FK constraint)
-    await client.query('DELETE FROM profiles WHERE id = $1', [id]);
-    // Delete user
+    // NULL out FK references in all dependent tables so historical records are preserved
+    await client.query('UPDATE alerts          SET assigned_to = NULL WHERE assigned_to = $1', [id]);
+    await client.query('UPDATE documents       SET uploaded_by = NULL WHERE uploaded_by = $1', [id]);
+    await client.query('UPDATE notes           SET created_by  = NULL WHERE created_by  = $1', [id]);
+    await client.query('UPDATE investigations  SET assigned_to = NULL WHERE assigned_to = $1', [id]);
+    // profiles has ON DELETE CASCADE so it is removed automatically when users row is deleted
     await client.query('DELETE FROM users WHERE id = $1', [id]);
     await client.query('COMMIT');
     client.release();
