@@ -280,6 +280,11 @@ export async function adminUpdateUserRole(userId, role) {
   return apiPatch(`/api/admin/users/${userId}/role`, { role });
 }
 
+export async function adminDeleteUser(userId) {
+  return apiDelete(`/api/admin/users/${userId}`);
+}
+
+
 // ============================================================
 // AML Rule Generation (Added for Issue 2 & 3)
 // ============================================================

@@ -42,7 +42,11 @@
   flex-direction: column;
   gap: 0.5rem;
   flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
 }
+.sidebar-nav::-webkit-scrollbar { display: none; }
 
 .nav-link {
   display: flex;
@@ -152,6 +156,26 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.header-logout-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: transparent;
+  border: 1px solid rgba(244, 63, 94, 0.25);
+  color: var(--gafa-danger);
+  border-radius: 10px;
+  padding: 0.45rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  font-family: inherit;
+}
+.header-logout-btn:hover {
+  background: rgba(244, 63, 94, 0.12);
+  border-color: var(--gafa-danger);
 }
 
 .breadcrumb {

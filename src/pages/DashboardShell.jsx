@@ -97,9 +97,14 @@ export default function DashboardShell() {
            <div className="breadcrumb">
               <span>Platform</span> / <span>{NAV_ITEMS.find(n => n.path === location.pathname)?.label || 'System'}</span>
            </div>
-           <div className="header-status">
-              <span className="pulse-dot" />
-              <span>Network Secure</span>
+           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+             <div className="header-status">
+               <span className="pulse-dot" />
+               <span>Network Secure</span>
+             </div>
+             <button className="header-logout-btn" onClick={logout} title="Logout">
+               <LogOut size={14} /> Logout
+             </button>
            </div>
         </header>
         <div className="content-inner">

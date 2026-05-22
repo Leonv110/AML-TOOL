@@ -212,4 +212,59 @@ router.patch('/users/:id/role', authenticateToken, requireAdmin, validate(schema
   }
 });
 
+/**
+ * @swagger
+ * /admin/users/{id}:
+ *   delete:
+ *     summary: Delete a user account (admin only)
+ *     tags: [Admin]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: User deleted successfully
+ *       400:
+ *         description: Cannot delete own account
+ *       404:
+ *         description: User not found
+ */
+router.delete('/users/:id', authenticateToken, requireAdmin, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { id } = req.params;
+
+    // Prevent admin from deleting their own account
+    if (id === req.user.id) {
+      client.release();
+      return res.status(400).json({ error: 'You cannot delete your own account.' });
+    }
+
+    // Check user exists
+    const existing = await client.query('SELECT id FROM users WHERE id = $1', [id]);
+    if (existing.rows.length === 0) {
+      client.release();
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    await client.query('BEGIN');
+    // Delete profile first (FK constraint)
+    await client.query('DELETE FROM profiles WHERE id = $1', [id]);
+    // Delete user
+    await client.query('DELETE FROM users WHERE id = $1', [id]);
+    await client.query('COMMIT');
+    client.release();
+
+    res.json({ message: 'User deleted successfully.' });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    client.release();
+    console.error('Delete user error:', err);
+    res.status(500).json({ error: 'Failed to delete user. Please try again.' });
+  }
+});
+
 module.exports = router;

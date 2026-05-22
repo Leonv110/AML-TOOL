@@ -2,13 +2,15 @@ import { useState, useEffect } from 'react';
 import { 
   Activity, Server, Database, Brain, Cpu, HardDrive, 
   Terminal, AlertTriangle, CheckCircle2, RefreshCw, BarChart,
-  Users, UserPlus, Shield, Eye, EyeOff
+  Users, UserPlus, Shield, Eye, EyeOff, Trash2
 } from 'lucide-react';
 import { apiGet } from '../apiClient';
-import { fetchAdminUsers, adminCreateUser, adminUpdateUserRole } from '../services/dataService';
+import { fetchAdminUsers, adminCreateUser, adminUpdateUserRole, adminDeleteUser } from '../services/dataService';
+import { useAuth } from '../contexts/AuthContext';
 import './AdminPanel.css';
 
 export default function AdminPanel() {
+  const { user: currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState('monitor');
   const [stats, setStats] = useState({
     apiStatus: 'online',
@@ -37,6 +39,11 @@ export default function AdminPanel() {
   const [createError, setCreateError] = useState('');
   const [createSuccess, setCreateSuccess] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+  const [deleteError, setDeleteError] = useState('');
+  // Delete confirmation modal state
+  const [deleteModal, setDeleteModal] = useState(null); // { id, email }
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   useEffect(() => {
     const checkHealth = async () => {
@@ -99,6 +106,34 @@ export default function AdminPanel() {
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
     } catch (err) {
       console.error('Failed to update role:', err);
+    }
+  }
+
+  function openDeleteModal(userId, userEmail) {
+    setDeleteModal({ id: userId, email: userEmail });
+    setDeleteConfirmText('');
+    setDeleteError('');
+  }
+
+  function closeDeleteModal() {
+    setDeleteModal(null);
+    setDeleteConfirmText('');
+    setDeleteError('');
+  }
+
+  async function confirmDeleteUser() {
+    if (!deleteModal) return;
+    setDeletingId(deleteModal.id);
+    setDeleteError('');
+    try {
+      await adminDeleteUser(deleteModal.id);
+      setUsers(prev => prev.filter(u => u.id !== deleteModal.id));
+      setCreateSuccess(`User "${deleteModal.email}" has been permanently deleted.`);
+      closeDeleteModal();
+    } catch (err) {
+      setDeleteError(err?.message || err?.error || 'Failed to delete user. Please try again.');
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -269,6 +304,11 @@ export default function AdminPanel() {
               <AlertTriangle size={16} /> {createError}
             </div>
           )}
+          {deleteError && (
+            <div className="user-msg error-msg">
+              <AlertTriangle size={16} /> {deleteError}
+            </div>
+          )}
 
           {/* Create User Form */}
           {showCreateForm && (
@@ -359,7 +399,7 @@ export default function AdminPanel() {
                       <td className="date-cell">
                         {u.created_at ? new Date(u.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
                       </td>
-                      <td>
+                      <td style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                         <select
                           className="role-select"
                           value={u.role || 'student'}
@@ -370,12 +410,80 @@ export default function AdminPanel() {
                           <option value="exam">Exam</option>
                           <option value="admin">Admin</option>
                         </select>
+                        <button
+                          className="delete-user-btn"
+                          title={u.id === currentUser?.id ? 'Cannot delete your own account' : `Delete ${u.email}`}
+                          disabled={u.id === currentUser?.id || deletingId === u.id}
+                          onClick={() => openDeleteModal(u.id, u.email)}
+                        >
+                          {deletingId === u.id
+                            ? <span style={{ fontSize: '0.7rem' }}>...</span>
+                            : <Trash2 size={14} />}
+                        </button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ===== DELETE CONFIRMATION MODAL ===== */}
+      {deleteModal && (
+        <div className="delete-modal-overlay" onClick={closeDeleteModal}>
+          <div className="delete-modal" onClick={e => e.stopPropagation()}>
+            <div className="delete-modal-header">
+              <div className="delete-modal-icon">
+                <Trash2 size={22} />
+              </div>
+              <div>
+                <h3>Delete User Account</h3>
+                <p>This action is permanent and cannot be undone.</p>
+              </div>
+            </div>
+
+            <div className="delete-modal-body">
+              <div className="delete-modal-target">
+                <span className="delete-modal-label">Account to be deleted</span>
+                <span className="delete-modal-email">{deleteModal.email}</span>
+              </div>
+
+              <p className="delete-modal-instruction">
+                To confirm, type <strong>DELETE</strong> in the field below:
+              </p>
+              <input
+                className={`delete-confirm-input ${deleteConfirmText.toLowerCase() === 'delete' ? 'input-valid' : deleteConfirmText.length > 0 ? 'input-invalid' : ''}`}
+                type="text"
+                placeholder="Type DELETE to confirm"
+                value={deleteConfirmText}
+                onChange={e => setDeleteConfirmText(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && deleteConfirmText.toLowerCase() === 'delete' && confirmDeleteUser()}
+                autoFocus
+                autoComplete="off"
+                spellCheck={false}
+              />
+
+              {deleteError && (
+                <div className="delete-modal-error">
+                  <AlertTriangle size={14} /> {deleteError}
+                </div>
+              )}
+            </div>
+
+            <div className="delete-modal-actions">
+              <button className="delete-modal-cancel" onClick={closeDeleteModal}>
+                Cancel
+              </button>
+              <button
+                className="delete-modal-confirm"
+                disabled={deleteConfirmText.toLowerCase() !== 'delete' || !!deletingId}
+                onClick={confirmDeleteUser}
+              >
+                {deletingId ? 'Deleting...' : 'Permanently Delete'}
+              </button>
+            </div>
           </div>
         </div>
       )}
