@@ -113,37 +113,66 @@ class AMLProcessor:
 
             df.drop(columns=['Date_Temp'], inplace=True, errors='ignore')
 
-        # 4. Spike Detection: Use IsolationForest
+        # 4. Velocity Spike: >=7/hr during odd hours (midnight-5AM IST) OR >=4/hr AND 3x 3-month avg
         t_col = 'transaction_date' if 'transaction_date' in df.columns else 'timestamp'
         u_col = 'customer_id' if 'customer_id' in df.columns else 'user_id'
 
-        if 'amount' in df.columns and (t_col in df.columns or 'transaction_frequency_1hr' in df.columns):
+        if 'amount' in df.columns and t_col in df.columns and u_col in df.columns:
             p(60, "Applying Velocity Spike rule...")
-            if 'transaction_frequency_1hr' not in df.columns and t_col in df.columns and u_col in df.columns:
-                 df['Date_Temp'] = pd.to_datetime(df[t_col], errors='coerce')
-                 df = df.sort_values([u_col, 'Date_Temp'])
-                 df['dummy_count'] = 1
-                 freqs = []
-                 for user, group in df.groupby(u_col):
-                     group_idx = group.set_index('Date_Temp')
-                     counts = group_idx['dummy_count'].rolling('1h').sum().values
-                     freqs.extend(counts)
+            df['VS_Date'] = pd.to_datetime(df[t_col], errors='coerce')
 
-                 df['transaction_frequency_1hr'] = freqs
-                 print("Calculated transaction_frequency_1hr from history (Fast).")
+            # Compute 3-month average hourly frequency per user
+            user_3m_avg = {}
+            for user, group in df.groupby(u_col):
+                group_sorted = group.dropna(subset=['VS_Date']).sort_values('VS_Date')
+                if len(group_sorted) > 0:
+                    total_hours = max((group_sorted['VS_Date'].max() - group_sorted['VS_Date'].min()).total_seconds() / 3600, 1)
+                    user_3m_avg[user] = len(group_sorted) / total_hours
+                else:
+                    user_3m_avg[user] = 0
 
-            X = df[['amount', 'transaction_frequency_1hr']].apply(pd.to_numeric, errors='coerce').fillna(0)
+            IST_ODD_HOURS_START = 18  # 18:30 UTC = midnight IST
+            IST_ODD_HOURS_END = 23    # 23:30 UTC = 5:00 AM IST
 
-            if len(X) > 0:
-                clf = IsolationForest(contamination=0.10, random_state=42)
-                preds = clf.fit_predict(X)
+            # Find spiked windows: for each user collect windows where rolling 1hr count
+            # crosses threshold, then flag ALL transactions in those windows
+            spike_indices = set()
+            for user, group in df.groupby(u_col):
+                group_sorted = group.dropna(subset=['VS_Date']).sort_values('VS_Date').copy()
+                if group_sorted.empty:
+                    continue
+                avg_freq = user_3m_avg.get(user, 0)
 
-                for idx, pred in zip(df.index, preds):
-                    if pred == -1:
-                        df.at[idx, 'flagged'] = True
-                        df.at[idx, 'flag_reason'] = append_reason(df.at[idx, 'flag_reason'], 'Velocity Spike')
-                        if not df.at[idx, 'rule_triggered']:
-                            df.at[idx, 'rule_triggered'] = 'Velocity Spike'
+                # Normalize to tz-naive UTC for arithmetic
+                vs_naive = group_sorted['VS_Date'].dt.tz_convert('UTC').dt.tz_localize(None)
+                group_sorted['VS_naive'] = vs_naive
+                dates_naive = vs_naive.values
+                n = len(dates_naive)
+
+                for i in range(n):
+                    dt_i = pd.Timestamp(dates_naive[i])
+                    # count txns within 1 hour ending at dt_i
+                    window_start = dt_i - pd.Timedelta(hours=1)
+                    window_mask = (group_sorted['VS_naive'] >= window_start) & (group_sorted['VS_naive'] <= dt_i)
+                    window_rows = group_sorted[window_mask]
+                    freq = len(window_rows)
+
+                    is_odd = IST_ODD_HOURS_START <= dt_i.hour <= IST_ODD_HOURS_END
+                    spike_odd = is_odd and freq >= 7
+                    spike_avg = (freq >= 4) and (avg_freq > 0) and (freq >= 3 * avg_freq)
+
+                    if spike_odd or spike_avg:
+                        # Flag every transaction in this window
+                        for widx in window_rows.index:
+                            spike_indices.add(widx)
+
+            for idx in spike_indices:
+                df.at[idx, 'flagged'] = True
+                df.at[idx, 'flag_reason'] = append_reason(df.at[idx, 'flag_reason'], 'Velocity Spike')
+                if not df.at[idx, 'rule_triggered']:
+                    df.at[idx, 'rule_triggered'] = 'Velocity Spike'
+
+            df.drop(columns=['VS_Date'], inplace=True, errors='ignore')
 
         # 5. Layering: Directed graph cycle detection
         u_col = 'user_id' if 'user_id' in df.columns else 'customer_id'
@@ -180,7 +209,7 @@ class AMLProcessor:
             except Exception as e:
                 print(f"Error executing Layering detection: {e}")
 
-        # 6. Rapid Fund Movement: Flag if > 80% of balance moved out quickly after deposit
+        # 6. Rapid Fund Movement: >=85% of balance moved AND amount >8k
         if all(col in df.columns for col in ['amount', 'balance_before', 'balance_after']):
             p(83, "Applying Rapid Fund Movement rule...")
             for idx, row in df.iterrows():
@@ -188,9 +217,9 @@ class AMLProcessor:
                     bal_before = float(row.get('balance_before', 0) or 0)
                     bal_after = float(row.get('balance_after', 0) or 0)
                     amt = float(row.get('amount', 0) or 0)
-                    if bal_before > 0 and amt > 0:
+                    if bal_before > 0 and amt > 8000:
                         pct_moved = (bal_before - bal_after) / bal_before
-                        if pct_moved >= 0.80:
+                        if pct_moved >= 0.85:
                             df.at[idx, 'flagged'] = True
                             df.at[idx, 'flag_reason'] = append_reason(df.at[idx, 'flag_reason'], 'Rapid Fund Movement')
                             if not df.at[idx, 'rule_triggered']:
@@ -198,16 +227,14 @@ class AMLProcessor:
                 except (ValueError, TypeError):
                     pass
 
-        # 7. New Device High Value: Flag high value txn from unrecognised device
+        # 7. New Device High Value: new_device=true AND amount >20,000
         if 'is_new_device' in df.columns and 'amount' in df.columns:
             p(86, "Applying New Device High Value rule...")
-            avg_amount = pd.to_numeric(df['amount'], errors='coerce').mean()
-            threshold = avg_amount * 2 if avg_amount > 0 else 50000
             for idx, row in df.iterrows():
                 try:
                     if row.get('is_new_device') in [True, 'true', 'True', 1, '1']:
                         amt = float(row.get('amount', 0) or 0)
-                        if amt >= threshold:
+                        if amt > 20000:
                             df.at[idx, 'flagged'] = True
                             df.at[idx, 'flag_reason'] = append_reason(df.at[idx, 'flag_reason'], 'New Device High Value')
                             if not df.at[idx, 'rule_triggered']:
